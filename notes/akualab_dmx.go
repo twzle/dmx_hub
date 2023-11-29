@@ -25,16 +25,23 @@ func main() {
 	dmxDevice.Render()
 
 	// sending random signals to first 4 channels
-	for {
+	for i := 0; i < 10; i++ {
 
 		// Wait.
 		time.Sleep(100 * time.Millisecond)
 
-		dmxDevice.SetChannel(1, 20)                // Intensity
-		dmxDevice.SetChannel(2, byte(r.Intn(256))) // R
-		dmxDevice.SetChannel(3, byte(r.Intn(256))) // G
-		dmxDevice.SetChannel(4, byte(r.Intn(256))) // B
+		dmxDevice.SetChannel(1, 20)
+		dmxDevice.SetChannel(2, byte(r.Intn(256)))
+		dmxDevice.SetChannel(3, byte(r.Intn(256)))
+		dmxDevice.SetChannel(4, byte(r.Intn(256)))
 		dmxDevice.Render()
 
 	}
+
+	// sending 0 to all channels
+	for i := 1; i <= 512; i++ {
+		dmxDevice.SetChannel(i, 0)
+	}
+	dmxDevice.Render()
+	time.Sleep(100 * time.Millisecond)
 }
