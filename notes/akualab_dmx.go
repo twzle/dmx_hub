@@ -39,7 +39,7 @@ func main() {
 	}
 
 	// sending 0 to all channels
-	for i := 1; i <= 512; i++ {
+	for i := 1; i <= 510; i++ {
 		dmxDevice.SetChannel(i, 0)
 	}
 	dmxDevice.Render()
