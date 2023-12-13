@@ -2,7 +2,7 @@ package internal
 
 type SetChannel struct {
 	Channel  int    `hubman:"channel"` // up to 512
-	Value    byte   `hubman:"value"`
+	Value    int    `hubman:"value"`
 	DMXAlias string `hubman:"dmx_alias"`
 }
 

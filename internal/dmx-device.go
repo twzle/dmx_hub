@@ -40,7 +40,8 @@ func (d *device) SetValueToChannel(ctx context.Context, command SetChannel) erro
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	err := d.dev.SetChannel(command.Channel, command.Value)
+	sig := byte(command.Value)
+	err := d.dev.SetChannel(command.Channel, sig)
 	if err != nil {
 		return fmt.Errorf("setting value to channel error: %v", err)
 	}
