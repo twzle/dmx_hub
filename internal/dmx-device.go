@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"git.miem.hse.ru/hubman/dmx-executor/config"
 	"github.com/akualab/dmx"
 )
 
@@ -12,7 +13,7 @@ type DMXDevice interface {
 	Blackout(ctx context.Context) error
 }
 
-func NewDMXDevice(ctx context.Context, conf DMXConfig) (DMXDevice, error) {
+func NewDMXDevice(ctx context.Context, conf config.DMXConfig) (DMXDevice, error) {
 	dev, err := dmx.NewDMXConnection(conf.Path)
 	if err != nil {
 		return nil, fmt.Errorf("error with creating new dmx device: %v", err)

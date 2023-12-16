@@ -2,44 +2,70 @@ package config
 
 import (
 	"fmt"
-	"github.com/ilyakaznacheev/cleanenv"
+	"gopkg.in/yaml.v3"
+	"os"
 )
 
-type (
-	// Config -.
-	Config struct {
-		HTTP   `yaml:"http"`
-		Redis  `yaml:"redis"`
-		Logger `yaml:"logger"`
-	}
-	// HTTP -.
-	HTTP struct {
-		Host string `env-required:"true" yaml:"host" env:"HTTP_HOST"`
-		Port uint16 `env-required:"true" yaml:"port" env:"HTTP_PORT"`
-	}
-	// Redis -.
-	Redis struct {
-		RedisUrl string `env-required:"true" yaml:"url" env:"REDIS_URL"`
-	}
-	// Logger -.
-	Logger struct {
-		Level string `env-required:"false" yaml:"level" env:"LOGGER_LEVEL"`
-	}
-)
+type DMXConfig struct {
+	Alias string `json:"alias" yaml:"alias"`
+	Path  string `json:"path" yaml:"path"`
+}
 
-// NewConfig returns app config.
-func NewConfig() (*Config, error) {
-	cfg := &Config{}
+type UserConfig struct {
+	DMXDevices []DMXConfig `json:"dmx_devices" yaml:"dmx_devices"`
+}
 
-	err := cleanenv.ReadConfig("./config/config.yml", cfg)
+func (conf *UserConfig) Validate() error {
+	if len(conf.DMXDevices) == 0 {
+		fmt.Println("DMX devices were not found in configuration file")
+	}
+	if alias, has := conf.hasDuplicateDevices(); has {
+		return fmt.Errorf("found duplicate DMX device with alias {%s} in config", alias)
+	}
+	for idx, device := range conf.DMXDevices {
+		if device.Alias == "" {
+			return fmt.Errorf("device #{%d} ({%s}): "+
+				"valid DMX device_name must be provided in config",
+				idx, device.Alias)
+		}
+	}
+	return nil
+}
+
+func (conf *UserConfig) hasDuplicateDevices() (string, bool) {
+	x := make(map[string]struct{})
+
+	for _, v := range conf.DMXDevices {
+		if _, has := x[v.Alias]; has {
+			return v.Alias, true
+		}
+		x[v.Alias] = struct{}{}
+	}
+
+	return "", false
+}
+
+func InitConfig(confPath string) (*UserConfig, error) {
+	jsonFile, err := os.ReadFile(confPath)
 	if err != nil {
-		return nil, fmt.Errorf("config error: %w", err)
+		return nil, err
 	}
+	cfg, err := ParseConfigFromBytes(jsonFile)
+	return cfg, err
+}
 
-	err = cleanenv.ReadEnv(cfg)
+func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
+	cfg := UserConfig{}
+
+	err := yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return cfg, nil
+	err = cfg.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
 }
