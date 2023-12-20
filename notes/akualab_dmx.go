@@ -11,7 +11,7 @@ func main() {
 
 	r := rand.New(rand.NewSource(99))
 	log.Printf("start DMX")
-	dmxDevice, e := dmx.NewDMXConnection("/dev/ttyUSB0")
+	dmxDevice, e := dmx.NewDMXConnection("/dev/tty.usbserial-AD5FD3N7")
 	if e != nil {
 		log.Fatal(e)
 	}

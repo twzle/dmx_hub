@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"git.miem.hse.ru/hubman/dmx-executor/config"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +19,7 @@ type dmxManager struct {
 	logger  *zap.Logger
 }
 
-func (m *dmxManager) UpdateDMXDevices(ctx context.Context, dmxConfigs []DMXConfig) {
+func (m *dmxManager) UpdateDMXDevices(ctx context.Context, dmxConfigs []config.DMXConfig) {
 	dmxSet := make(map[string]bool, len(dmxConfigs))
 	for _, dev := range dmxConfigs {
 		dmxSet[dev.Alias] = true
@@ -80,7 +81,7 @@ func (m *dmxManager) getDMXForAction(DMXAlias string) (DMXDevice, error) {
 
 }
 
-func (m *dmxManager) addDMX(ctx context.Context, conf DMXConfig) error {
+func (m *dmxManager) addDMX(ctx context.Context, conf config.DMXConfig) error {
 	newDMX, err := NewDMXDevice(ctx, conf)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)

@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"os"
 
 	"git.miem.hse.ru/hubman/dmx-executor/config"
@@ -17,7 +15,10 @@ import (
 )
 
 func main() {
-	cfg, err := config.NewConfig()
+	systemConfig := &core.SystemConfig{}
+	userConfig := &config.UserConfig{}
+
+	err := core.ReadConfig(systemConfig, userConfig)
 	if err != nil {
 		log.Fatalf("error while init config: %v", err)
 	}
@@ -32,19 +33,9 @@ func main() {
 
 	app := hubman.NewAgentApp(
 		core.AgentConfiguration{
-			System: &core.SystemConfig{
-				Server: &core.InterfaceConfig{
-					IP:   net.ParseIP(cfg.Host),
-					Port: cfg.Port,
-				},
-				RedisUrl: cfg.RedisUrl,
-			},
-			User: &internal.RefreshConfig{},
-			ParseUserConfig: func(jsonBuf []byte) (core.Configuration, error) {
-				var conf internal.RefreshConfig
-				err := json.Unmarshal(jsonBuf, &conf)
-				return &conf, err
-			},
+			System:          systemConfig,
+			User:            userConfig,
+			ParseUserConfig: func(data []byte) (core.Configuration, error) { return config.ParseConfigFromBytes(data) },
 		},
 		hubman.WithExecutor(
 			hubman.WithCommand(internal.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
@@ -67,12 +58,12 @@ func main() {
 			}),
 		),
 		hubman.WithOnConfigRefresh(func(configuration core.AgentConfiguration) {
-			update, ok := configuration.User.(*internal.RefreshConfig)
+			update, ok := configuration.User.(*config.UserConfig)
 			if !ok {
 				panic(
 					fmt.Sprintf(
 						"Refresh config error: expected type %T, received %T",
-						internal.RefreshConfig{},
+						config.UserConfig{},
 						configuration.User,
 					),
 				)
