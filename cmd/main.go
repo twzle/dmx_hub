@@ -24,52 +24,56 @@ func main() {
 	}
 	ctx := context.Background()
 
-	logger, err := internal.NewLogger()
-	if err != nil {
-		log.Fatalf("error while init logger: %v", err)
+
+	agentConf := core.AgentConfiguration{
+		System:          systemConfig,
+		User:            userConfig,
+		ParseUserConfig: func(data []byte) (core.Configuration, error) { return config.ParseConfigFromBytes(data) },
 	}
+
+	app := core.NewContainer(agentConf.System.Logging)
+	logger := app.Logger()
 
 	manager := internal.NewManager(logger)
 
-	app := hubman.NewAgentApp(
-		core.AgentConfiguration{
-			System:          systemConfig,
-			User:            userConfig,
-			ParseUserConfig: func(data []byte) (core.Configuration, error) { return config.ParseConfigFromBytes(data) },
-		},
-		hubman.WithExecutor(
-			hubman.WithCommand(internal.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
-				var cmd internal.SetChannel // json-like api
-				parser(&cmd)                // enriches your command with data from redis
+	app.RegisterPlugin(
+		hubman.NewAgentPlugin(
+			app.Logger(),
+			agentConf,
+			hubman.WithExecutor(
+				hubman.WithCommand(internal.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd internal.SetChannel // json-like api
+					parser(&cmd)                // enriches your command with data from redis
 
-				err := manager.ProcessSetChannel(ctx, cmd)
-				if err != nil {
-					logger.Error(fmt.Sprintf("error while execute move command: %v", err))
-				}
-			}),
-			hubman.WithCommand(internal.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
-				var cmd internal.Blackout // json-like api
-				parser(&cmd)              // enriches your command with data from redis
+					err := manager.ProcessSetChannel(ctx, cmd)
+					if err != nil {
+						logger.Error(fmt.Sprintf("error while execute move command: %v", err))
+					}
+				}),
+				hubman.WithCommand(internal.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd internal.Blackout // json-like api
+					parser(&cmd)              // enriches your command with data from redis
 
-				err := manager.ProcessBlackout(ctx, cmd)
-				if err != nil {
-					logger.Error(fmt.Sprintf("error while execute update speed command: %v", err))
+					err := manager.ProcessBlackout(ctx, cmd)
+					if err != nil {
+						logger.Error(fmt.Sprintf("error while execute update speed command: %v", err))
+					}
+				}),
+			),
+			hubman.WithOnConfigRefresh(func(configuration core.AgentConfiguration) {
+				update, ok := configuration.User.(*config.UserConfig)
+				if !ok {
+					panic(
+						fmt.Sprintf(
+							"Refresh config error: expected type %T, received %T",
+							config.UserConfig{},
+							configuration.User,
+						),
+					)
 				}
+				manager.UpdateDMXDevices(ctx, update.DMXDevices)
 			}),
 		),
-		hubman.WithOnConfigRefresh(func(configuration core.AgentConfiguration) {
-			update, ok := configuration.User.(*config.UserConfig)
-			if !ok {
-				panic(
-					fmt.Sprintf(
-						"Refresh config error: expected type %T, received %T",
-						config.UserConfig{},
-						configuration.User,
-					),
-				)
-			}
-			manager.UpdateDMXDevices(ctx, update.DMXDevices)
-		}),
 	)
 
 	<-app.WaitShutdown()

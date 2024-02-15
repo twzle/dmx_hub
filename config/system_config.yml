@@ -1,5 +1,6 @@
+redis_url: "redis://localhost:6379"
 server:
   ip: 127.0.0.1
   port: 8081
-
-redis_url: "redis://localhost:6379"
+logging:
+  level: debug
