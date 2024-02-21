@@ -1,3 +1,13 @@
 dmx_devices:
   - alias: DMX1
     path: "/dev/ttyUSB0"
+artnet_devices:
+  - alias: Artnet1
+    ip: "127.0.0.1"
+    universe: 
+    -  initial_index: 0 
+       value: 100 
+    -  initial_index: 10
+       value: 20
+    -  initial_index: 11
+       value: 0   

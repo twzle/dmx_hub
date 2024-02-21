@@ -16,28 +16,28 @@ type DMXDevice interface {
 func NewDMXDevice(ctx context.Context, conf config.DMXConfig) (DMXDevice, error) {
 	dev, err := dmx.NewDMXConnection(conf.Path)
 	if err != nil {
-		return nil, fmt.Errorf("error with creating new dmx device: %v", err)
+		return nil, fmt.Errorf("error with creating new dmx dmxDevice: %v", err)
 	}
 
-	newDMX := &device{alias: conf.Alias, dev: dev}
+	newDMX := &dmxDevice{alias: conf.Alias, dev: dev}
 
 	if err != nil {
-		return nil, fmt.Errorf("error getting device with alias %v profile token: %v", conf.Alias, err)
+		return nil, fmt.Errorf("error getting dmxDevice with alias %v profile token: %v", conf.Alias, err)
 	}
 
 	return newDMX, nil
 }
 
-type device struct {
+type dmxDevice struct {
 	alias string
 	dev   *dmx.DMX
 }
 
-func (d *device) GetAlias() string {
+func (d *dmxDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *device) SetValueToChannel(ctx context.Context, command SetChannel) error {
+func (d *dmxDevice) SetValueToChannel(ctx context.Context, command SetChannel) error {
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
@@ -53,7 +53,7 @@ func (d *device) SetValueToChannel(ctx context.Context, command SetChannel) erro
 	return nil
 }
 
-func (d *device) Blackout(ctx context.Context) error {
+func (d *dmxDevice) Blackout(ctx context.Context) error {
 	d.dev.ClearAll()
 	err := d.dev.Render()
 	if err != nil {
