@@ -1,29 +1,18 @@
-package internal
+package artnet
 
 import (
 	"context"
 	"fmt"
-	"log"
-	"net"
 
-	"git.miem.hse.ru/hubman/dmx-executor/config"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 	"github.com/jsimonetti/go-artnet"
 )
 
-type ArtNetDevice interface {
-	GetAlias() string
-	SetValueToChannel(ctx context.Context, channel uint16, value uint16) error
-	Blackout(ctx context.Context) error
-}
-
-func NewArtNetDevice(ctx context.Context, conf config.ArtNetConfig) (ArtNetDevice, error) {
-	ip := net.ParseIP(conf.IP)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid ip address for artnet device: %v", conf.IP)
-	}
-
+func NewArtNetDevice(ctx context.Context, conf config.ArtNetConfig) (device.Device, error) {
 	log := artnet.NewDefaultLogger()
-	dev := artnet.NewController(conf.Alias, ip, log)
+	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
 
 	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev}
@@ -53,25 +42,20 @@ func (d *artnetDevice) ReadUniverse(universe []config.ChannelRange) string {
 		value, ok := artNetUniverse[uint16(idx)] 
 		if ok {
 			channelValue = value
-			log.Println(value)
 		}
 
 		channel = byte(channelValue)
 		d.universe[idx] = channel
 	}
 
-	for _, channel := range d.universe {
-		fmt.Printf("%d ", channel)
-	}
-
 	return d.alias
 }
 
-func (d *artnetDevice) SetValueToChannel(ctx context.Context, channel uint16, value uint16) error {
-	if channel < 1 || channel >= 512 {
-		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", channel)
+func (d *artnetDevice) SetValueToChannel(ctx context.Context, command models.SetChannel) error {
+	if command.Channel < 1 || command.Channel >= 512 {
+		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	d.universe[channel] = byte(value)
+	d.universe[command.Channel] = byte(command.Value)
 	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
 
 	for _, channel := range d.universe {

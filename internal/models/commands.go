@@ -1,9 +1,9 @@
-package internal
+package models
 
 type SetChannel struct {
-	Channel  int    `hubman:"channel"` // up to 512
-	Value    int    `hubman:"value"`
-	DMXAlias string `hubman:"dmx_alias"`
+	Channel     int    `hubman:"channel"` // up to 512
+	Value       int    `hubman:"value"`
+	DeviceAlias string `hubman:"device_alias"`
 }
 
 func (s SetChannel) Code() string {
@@ -15,7 +15,7 @@ func (s SetChannel) Description() string {
 }
 
 type Blackout struct {
-	DMXAlias string `hubman:"dmx_alias"`
+	DeviceAlias string `hubman:"device_alias"`
 }
 
 func (b Blackout) Code() string {

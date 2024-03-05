@@ -6,8 +6,9 @@ import (
 	"log"
 	"os"
 
-	"git.miem.hse.ru/hubman/dmx-executor/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 
 	"git.miem.hse.ru/hubman/hubman-lib"
 	"git.miem.hse.ru/hubman/hubman-lib/core"
@@ -41,8 +42,8 @@ func main() {
 			app.Logger(),
 			agentConf,
 			hubman.WithExecutor(
-				hubman.WithCommand(internal.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
-					var cmd internal.SetChannel // json-like api
+				hubman.WithCommand(models.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd models.SetChannel // json-like api
 					parser(&cmd)                // enriches your command with data from redis
 
 					err := manager.ProcessSetChannel(ctx, cmd)
@@ -50,8 +51,8 @@ func main() {
 						logger.Error(fmt.Sprintf("error while execute move command: %v", err))
 					}
 				}),
-				hubman.WithCommand(internal.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
-					var cmd internal.Blackout // json-like api
+				hubman.WithCommand(models.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd models.Blackout // json-like api
 					parser(&cmd)              // enriches your command with data from redis
 
 					err := manager.ProcessBlackout(ctx, cmd)
@@ -71,11 +72,12 @@ func main() {
 						),
 					)
 				}
-				manager.UpdateDMXDevices(ctx, update.DMXDevices)
+				manager.UpdateDevices(ctx, *update)
 			}),
 		),
 	)
 
+	manager.UpdateDevices(ctx, *userConfig)
 	<-app.WaitShutdown()
 	os.Exit(0)
 }

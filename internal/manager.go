@@ -3,40 +3,79 @@ package internal
 import (
 	"context"
 	"fmt"
-	"git.miem.hse.ru/hubman/dmx-executor/config"
+
+	"git.miem.hse.ru/hubman/dmx-executor/internal/artnet"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/dmx"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"go.uber.org/zap"
 )
 
-func NewManager(logger *zap.Logger) *dmxManager {
-	return &dmxManager{
-		devices: make(map[string]DMXDevice),
+func NewManager(logger *zap.Logger) *manager {
+	return &manager{
+		devices: make(map[string]device.Device),
 		logger:  logger,
 	}
 }
 
-type dmxManager struct {
-	devices map[string]DMXDevice
+type manager struct {
+	devices map[string]device.Device
 	logger  *zap.Logger
 }
 
-func (m *dmxManager) UpdateDMXDevices(ctx context.Context, dmxConfigs []config.DMXConfig) {
+func (m *manager) UpdateDevices(ctx context.Context, userConfig config.UserConfig) {
+	println("UPDATE")
+	dmxConfigs := userConfig.DMXDevices
+	artnetDeviceConfig := userConfig.ArtNetDevices
 	dmxSet := make(map[string]bool, len(dmxConfigs))
-	for _, dev := range dmxConfigs {
-		dmxSet[dev.Alias] = true
+	artnetDeviceSet := make(map[string]bool, len(artnetDeviceConfig))
+
+	m.UpdateDMXDevices(ctx, dmxSet, dmxConfigs)
+	m.UpdateArtNetDevices(ctx, artnetDeviceSet, artnetDeviceConfig)
+}
+
+func (m *manager) UpdateArtNetDevices(ctx context.Context, artnetDeviceSet map[string]bool, artnetDeviceConfig []config.ArtNetConfig){
+	for _, dev := range artnetDeviceConfig {
+		artnetDeviceSet[dev.Alias] = true
 	}
 
 	// Deleting the devices that have not been received
 	for alias := range m.devices {
-		if !dmxSet[alias] {
-			err := m.deleteDMX(ctx, alias)
+		if !artnetDeviceSet[alias] {
+			err := m.removeDevice(ctx, alias)
 			if err != nil {
 				m.logger.Error("error with update devices", zap.Error(err), zap.Any("alias", alias))
 			}
 		}
 	}
 
-	// Connect to new devices
-	for _, conf := range dmxConfigs {
+	for _, conf := range artnetDeviceConfig {
+		if _, exist := m.devices[conf.Alias]; !exist {
+			err := m.addArtNet(ctx, conf)
+			if err != nil {
+				m.logger.Error("error with update devices", zap.Error(err), zap.Any("conf", conf))
+			}
+		}
+	}
+}
+
+func (m *manager) UpdateDMXDevices(ctx context.Context, dmxDeviceSet map[string]bool, dmxDeviceConfig []config.DMXConfig){
+	for _, dev := range dmxDeviceConfig {
+		dmxDeviceSet[dev.Alias] = true
+	}
+
+	// Deleting the devices that have not been received
+	for alias := range m.devices {
+		if !dmxDeviceSet[alias] {
+			err := m.removeDevice(ctx, alias)
+			if err != nil {
+				m.logger.Error("error with update devices", zap.Error(err), zap.Any("alias", alias))
+			}
+		}
+	}
+
+	for _, conf := range dmxDeviceConfig {
 		if _, exist := m.devices[conf.Alias]; !exist {
 			err := m.addDMX(ctx, conf)
 			if err != nil {
@@ -46,8 +85,8 @@ func (m *dmxManager) UpdateDMXDevices(ctx context.Context, dmxConfigs []config.D
 	}
 }
 
-func (m *dmxManager) ProcessSetChannel(ctx context.Context, command SetChannel) error {
-	dev, err := m.getDMXForAction(command.DMXAlias)
+func (m *manager) ProcessSetChannel(ctx context.Context, command models.SetChannel) error {
+	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
 		return err
 	}
@@ -59,8 +98,8 @@ func (m *dmxManager) ProcessSetChannel(ctx context.Context, command SetChannel) 
 	return nil
 }
 
-func (m *dmxManager) ProcessBlackout(ctx context.Context, command Blackout) error {
-	dev, err := m.getDMXForAction(command.DMXAlias)
+func (m *manager) ProcessBlackout(ctx context.Context, command models.Blackout) error {
+	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
 		return err
 	}
@@ -72,17 +111,17 @@ func (m *dmxManager) ProcessBlackout(ctx context.Context, command Blackout) erro
 	return nil
 }
 
-func (m *dmxManager) getDMXForAction(DMXAlias string) (DMXDevice, error) {
-	dev, devExist := m.devices[DMXAlias]
+func (m *manager) checkDevice(deviceAlias string) (device.Device, error) {
+	dev, devExist := m.devices[deviceAlias]
 	if !devExist {
-		return nil, fmt.Errorf("dmx-device with alias %v not found", DMXAlias)
+		return nil, fmt.Errorf("dmx-device with alias %v not found", deviceAlias)
 	}
 	return dev, nil
 
 }
 
-func (m *dmxManager) addDMX(ctx context.Context, conf config.DMXConfig) error {
-	newDMX, err := NewDMXDevice(ctx, conf)
+func (m *manager) addDMX(ctx context.Context, conf config.DMXConfig) error {
+	newDMX, err := dmx.NewDMXDevice(ctx, conf)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}
@@ -90,7 +129,16 @@ func (m *dmxManager) addDMX(ctx context.Context, conf config.DMXConfig) error {
 	return nil
 }
 
-func (m *dmxManager) deleteDMX(_ context.Context, alias string) error {
+func (m *manager) addArtNet(ctx context.Context, conf config.ArtNetConfig) error {
+	newDMX, err := artnet.NewArtNetDevice(ctx, conf)
+	if err != nil {
+		return fmt.Errorf("error with add device: %v", err)
+	}
+	m.devices[newDMX.GetAlias()] = newDMX
+	return nil
+}
+
+func (m *manager) removeDevice(_ context.Context, alias string) error {
 	delete(m.devices, alias)
 	return nil
 }

@@ -7,21 +7,24 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+/* TODO: Добавить сцены где структура: map[SceneChannelID]DMXChannelID
+	Например, содержимое i-ой сцены =  [1: 11, 5: 2, 4: 17]
+*/
 
 type ChannelRange struct {
 	InitialIndex uint16 `json:"initial_index" yaml:"initial_index"`
 	Value        uint16 `json:"value" yaml:"value"`
 }
 
+type ArtNetConfig struct {
+	Alias    string         `json:"alias" yaml:"alias"`
+	IP       net.IP         `json:"ip" yaml:"ip"`
+	Universe []ChannelRange `json:"universe" yaml:"universe"`
+}
+
 type DMXConfig struct {
 	Alias string `json:"alias" yaml:"alias"`
 	Path  string `json:"path" yaml:"path"`
-}
-
-type ArtNetConfig struct {
-	Alias    string         `json:"alias" yaml:"alias"`
-	IP       string         `json:"ip" yaml:"ip"`
-	Universe []ChannelRange `json:"universe" yaml:"universe"`
 }
 
 type UserConfig struct {
@@ -52,7 +55,7 @@ func (conf *UserConfig) Validate() error {
 				"valid ArtNet device_name must be provided in config",
 				idx, device.Alias)
 		}
-		if net.ParseIP(device.IP) == nil {
+		if device.IP == nil {
 			return fmt.Errorf("device #{%d} ({%s}): "+
 				"valid ArtNet IP address must be provided in config",
 				idx, device.IP)
