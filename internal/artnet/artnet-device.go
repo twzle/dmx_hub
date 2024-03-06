@@ -14,9 +14,9 @@ func NewArtNetDevice(ctx context.Context, conf config.ArtNetConfig) (device.Devi
 	log := artnet.NewDefaultLogger()
 	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
-
+	
 	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev}
-	newArtNet.ReadUniverse(conf.Universe)
+	newArtNet.SetUniverse(conf.Universe)
 
 	return newArtNet, nil
 }
@@ -31,7 +31,7 @@ func (d *artnetDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *artnetDevice) ReadUniverse(universe []config.ChannelRange) string {
+func (d *artnetDevice) SetUniverse(universe []config.ChannelRange) {
 	artNetUniverse := make(map[uint16]uint16, len(universe))
 	for _, channelRange := range universe {
 		artNetUniverse[channelRange.InitialIndex] = channelRange.Value
@@ -47,8 +47,6 @@ func (d *artnetDevice) ReadUniverse(universe []config.ChannelRange) string {
 		channel = byte(channelValue)
 		d.universe[idx] = channel
 	}
-
-	return d.alias
 }
 
 func (d *artnetDevice) SetValueToChannel(ctx context.Context, command models.SetChannel) error {
@@ -57,10 +55,6 @@ func (d *artnetDevice) SetValueToChannel(ctx context.Context, command models.Set
 	}
 	d.universe[command.Channel] = byte(command.Value)
 	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
-
-	for _, channel := range d.universe {
-		fmt.Printf("%d ", channel)
-	}
 
 	return nil
 }

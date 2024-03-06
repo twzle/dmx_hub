@@ -7,9 +7,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
-/* TODO: Добавить сцены где структура: map[SceneChannelID]DMXChannelID
-	Например, содержимое i-ой сцены =  [1: 11, 5: 2, 4: 17]
-*/
 
 type ChannelRange struct {
 	InitialIndex uint16 `json:"initial_index" yaml:"initial_index"`
@@ -23,8 +20,9 @@ type ArtNetConfig struct {
 }
 
 type DMXConfig struct {
-	Alias string `json:"alias" yaml:"alias"`
-	Path  string `json:"path" yaml:"path"`
+	Alias    string         `json:"alias" yaml:"alias"`
+	Path     string         `json:"path" yaml:"path"`
+	Universe []ChannelRange `json:"universe" yaml:"universe"`
 }
 
 type UserConfig struct {
