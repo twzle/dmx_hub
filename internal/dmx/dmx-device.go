@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	DMX "github.com/akualab/dmx"
 )
 
@@ -18,6 +18,8 @@ func NewDMXDevice(ctx context.Context, conf config.DMXConfig) (device.Device, er
 
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev}
 	newDMX.SetUniverse(conf.Universe)
+	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
+	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
 
 	if err != nil {
 		return nil, fmt.Errorf("error getting dmxDevice with alias %v profile token: %v", conf.Alias, err)
@@ -27,9 +29,11 @@ func NewDMXDevice(ctx context.Context, conf config.DMXConfig) (device.Device, er
 }
 
 type dmxDevice struct {
-	alias string
-	universe [512]byte
-	dev   *DMX.DMX
+	alias        string
+	dev          *DMX.DMX
+	universe     [512]byte
+	scenes       map[string]device.Scene
+	currentScene *device.Scene
 }
 
 func (d *dmxDevice) GetAlias() string {
@@ -44,7 +48,7 @@ func (d *dmxDevice) SetUniverse(universe []config.ChannelRange) {
 
 	var channelValue uint16
 	for idx, channel := range d.universe {
-		value, ok := dmxUniverse[uint16(idx)] 
+		value, ok := dmxUniverse[uint16(idx)]
 		if ok {
 			channelValue = value
 		}
@@ -54,7 +58,27 @@ func (d *dmxDevice) SetUniverse(universe []config.ChannelRange) {
 	}
 }
 
-func (d *dmxDevice) SetValueToChannel(ctx context.Context, command models.SetChannel) error {
+
+func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
+	if d.currentScene == nil {
+		err := d.WriteValueToChannel(ctx, command)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	_, ok := d.currentScene.ChannelMap[command.Channel]
+	if !ok {
+		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
+	}
+	err := d.WriteValueToChannel(ctx, command)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *dmxDevice) WriteValueToChannel(ctx context.Context, command models.SetChannel) error {
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}

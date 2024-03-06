@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"github.com/jsimonetti/go-artnet"
 )
 
@@ -14,17 +14,21 @@ func NewArtNetDevice(ctx context.Context, conf config.ArtNetConfig) (device.Devi
 	log := artnet.NewDefaultLogger()
 	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
-	
+
 	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev}
 	newArtNet.SetUniverse(conf.Universe)
+	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
+	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
 
 	return newArtNet, nil
 }
 
 type artnetDevice struct {
-	alias    string
-	universe [512]byte
-	dev      *artnet.Controller
+	alias        string
+	dev          *artnet.Controller
+	universe     [512]byte
+	scenes       map[string]device.Scene
+	currentScene *device.Scene
 }
 
 func (d *artnetDevice) GetAlias() string {
@@ -39,7 +43,7 @@ func (d *artnetDevice) SetUniverse(universe []config.ChannelRange) {
 
 	var channelValue uint16
 	for idx, channel := range d.universe {
-		value, ok := artNetUniverse[uint16(idx)] 
+		value, ok := artNetUniverse[uint16(idx)]
 		if ok {
 			channelValue = value
 		}
@@ -49,7 +53,27 @@ func (d *artnetDevice) SetUniverse(universe []config.ChannelRange) {
 	}
 }
 
-func (d *artnetDevice) SetValueToChannel(ctx context.Context, command models.SetChannel) error {
+func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
+	if d.currentScene == nil {
+		err := d.WriteValueToChannel(ctx, command)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	_, ok := d.currentScene.ChannelMap[command.Channel]
+	if !ok {
+		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
+	}
+	err := d.WriteValueToChannel(ctx, command)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+
+func (d *artnetDevice) WriteValueToChannel(ctx context.Context, command models.SetChannel) error {
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}

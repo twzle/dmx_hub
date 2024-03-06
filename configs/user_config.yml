@@ -6,6 +6,7 @@ dmx_devices:
        value: 100 
     -  initial_index: 5
        value: 20
+    scenes:   
 artnet_devices:
   - alias: Artnet1
     ip: "127.0.0.1"
@@ -15,4 +16,23 @@ artnet_devices:
     -  initial_index: 10
        value: 20
     -  initial_index: 11
-       value: 0   
+       value: 0
+    scenes:
+    - scene_alias: "scene 1"
+      channel_map:
+      -  scene_channel_id: 0
+         universe_channel_id: 11
+      -  scene_channel_id: 1
+         universe_channel_id: 12
+      -  scene_channel_id: 2
+         universe_channel_id: 13   
+      -  scene_channel_id: 3
+         universe_channel_id: 14
+      -  scene_channel_id: 4
+         universe_channel_id: 15
+      -  scene_channel_id: 5
+         universe_channel_id: 16
+      -  scene_channel_id: 6
+         universe_channel_id: 17   
+      -  scene_channel_id: 7
+         universe_channel_id: 18

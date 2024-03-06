@@ -8,6 +8,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type ChannelMap struct {
+	SceneChannelID    uint16 `json:"scene_channel_id" yaml:"scene_channel_id"`
+	UniverseChannelID uint16 `json:"universe_channel_id" yaml:"universe_channel_id"`
+}
+
+type Scene struct {
+	Alias      string       `json:"scene_alias" yaml:"scene_alias"`
+	ChannelMap []ChannelMap `json:"channel_map" yaml:"channel_map"`
+}
+
 type ChannelRange struct {
 	InitialIndex uint16 `json:"initial_index" yaml:"initial_index"`
 	Value        uint16 `json:"value" yaml:"value"`
@@ -17,12 +27,14 @@ type ArtNetConfig struct {
 	Alias    string         `json:"alias" yaml:"alias"`
 	IP       net.IP         `json:"ip" yaml:"ip"`
 	Universe []ChannelRange `json:"universe" yaml:"universe"`
+	Scenes   []Scene		`json:"scenes" yaml:"scenes"`
 }
 
 type DMXConfig struct {
 	Alias    string         `json:"alias" yaml:"alias"`
 	Path     string         `json:"path" yaml:"path"`
 	Universe []ChannelRange `json:"universe" yaml:"universe"`
+	Scenes   []Scene		`json:"scenes" yaml:"scenes"`
 }
 
 type UserConfig struct {

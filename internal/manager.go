@@ -25,7 +25,6 @@ type manager struct {
 }
 
 func (m *manager) UpdateDevices(ctx context.Context, userConfig config.UserConfig) {
-	println("UPDATE")
 	dmxConfigs := userConfig.DMXDevices
 	artnetDeviceConfig := userConfig.ArtNetDevices
 	dmxSet := make(map[string]bool, len(dmxConfigs))
@@ -91,7 +90,7 @@ func (m *manager) ProcessSetChannel(ctx context.Context, command models.SetChann
 		return err
 	}
 
-	err = dev.SetValueToChannel(ctx, command)
+	err = dev.SetChannel(ctx, command)
 	if err != nil {
 		return fmt.Errorf("device with alias %v setting value error: %v", dev.GetAlias(), err)
 	}
@@ -130,11 +129,11 @@ func (m *manager) addDMX(ctx context.Context, conf config.DMXConfig) error {
 }
 
 func (m *manager) addArtNet(ctx context.Context, conf config.ArtNetConfig) error {
-	newDMX, err := artnet.NewArtNetDevice(ctx, conf)
+	newArtNet, err := artnet.NewArtNetDevice(ctx, conf)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}
-	m.devices[newDMX.GetAlias()] = newDMX
+	m.devices[newArtNet.GetAlias()] = newArtNet
 	return nil
 }
 
