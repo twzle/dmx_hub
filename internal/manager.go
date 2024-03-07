@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"git.miem.hse.ru/hubman/hubman-lib/core"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/artnet"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
@@ -15,13 +16,19 @@ import (
 func NewManager(logger *zap.Logger) *manager {
 	return &manager{
 		devices: make(map[string]device.Device),
+		signals: make(chan core.Signal),
 		logger:  logger,
 	}
 }
 
 type manager struct {
 	devices map[string]device.Device
+	signals chan core.Signal
 	logger  *zap.Logger
+}
+
+func (m *manager) GetSignals() chan core.Signal{
+	return m.signals
 }
 
 func (m *manager) UpdateDevices(ctx context.Context, userConfig config.UserConfig) {
@@ -34,7 +41,7 @@ func (m *manager) UpdateDevices(ctx context.Context, userConfig config.UserConfi
 	m.UpdateArtNetDevices(ctx, artnetDeviceSet, artnetDeviceConfig)
 }
 
-func (m *manager) UpdateArtNetDevices(ctx context.Context, artnetDeviceSet map[string]bool, artnetDeviceConfig []config.ArtNetConfig){
+func (m *manager) UpdateArtNetDevices(ctx context.Context, artnetDeviceSet map[string]bool, artnetDeviceConfig []config.ArtNetConfig) {
 	for _, dev := range artnetDeviceConfig {
 		artnetDeviceSet[dev.Alias] = true
 	}
@@ -59,7 +66,7 @@ func (m *manager) UpdateArtNetDevices(ctx context.Context, artnetDeviceSet map[s
 	}
 }
 
-func (m *manager) UpdateDMXDevices(ctx context.Context, dmxDeviceSet map[string]bool, dmxDeviceConfig []config.DMXConfig){
+func (m *manager) UpdateDMXDevices(ctx context.Context, dmxDeviceSet map[string]bool, dmxDeviceConfig []config.DMXConfig) {
 	for _, dev := range dmxDeviceConfig {
 		dmxDeviceSet[dev.Alias] = true
 	}
@@ -120,7 +127,7 @@ func (m *manager) checkDevice(deviceAlias string) (device.Device, error) {
 }
 
 func (m *manager) addDMX(ctx context.Context, conf config.DMXConfig) error {
-	newDMX, err := dmx.NewDMXDevice(ctx, conf)
+	newDMX, err := dmx.NewDMXDevice(ctx, m.signals, conf)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}
@@ -129,7 +136,7 @@ func (m *manager) addDMX(ctx context.Context, conf config.DMXConfig) error {
 }
 
 func (m *manager) addArtNet(ctx context.Context, conf config.ArtNetConfig) error {
-	newArtNet, err := artnet.NewArtNetDevice(ctx, conf)
+	newArtNet, err := artnet.NewArtNetDevice(ctx, m.signals, conf)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}

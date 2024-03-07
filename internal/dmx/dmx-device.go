@@ -3,6 +3,7 @@ package dmx
 import (
 	"context"
 	"fmt"
+	"git.miem.hse.ru/hubman/hubman-lib/core"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
@@ -10,13 +11,13 @@ import (
 	DMX "github.com/akualab/dmx"
 )
 
-func NewDMXDevice(ctx context.Context, conf config.DMXConfig) (device.Device, error) {
+func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMXConfig) (device.Device, error) {
 	dev, err := DMX.NewDMXConnection(conf.Path)
 	if err != nil {
 		return nil, fmt.Errorf("error with creating new dmx dmxDevice: %v", err)
 	}
 
-	newDMX := &dmxDevice{alias: conf.Alias, dev: dev}
+	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
 	newDMX.SetUniverse(conf.Universe)
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
@@ -34,6 +35,7 @@ type dmxDevice struct {
 	universe     [512]byte
 	scenes       map[string]device.Scene
 	currentScene *device.Scene
+	signals      chan core.Signal
 }
 
 func (d *dmxDevice) GetAlias() string {
@@ -58,19 +60,27 @@ func (d *dmxDevice) SetUniverse(universe []config.ChannelRange) {
 	}
 }
 
+func (d *dmxDevice) SetScene(sceneAlias string) error {
+	scene, ok := d.scenes[sceneAlias]
+	if !ok {
+		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
+	}
+	d.currentScene = &scene
+	
+	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
+	return nil
+}
 
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
-		err := d.WriteValueToChannel(ctx, command)
-		if err != nil {
-			return err
-		}
-		return nil
+		return fmt.Errorf("no scene is selected")
 	}
 	_, ok := d.currentScene.ChannelMap[command.Channel]
 	if !ok {
 		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
 	}
+	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(ctx, command)
 	if err != nil {
 		return err

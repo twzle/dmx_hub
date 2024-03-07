@@ -7,10 +7,11 @@ import (
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
+	"git.miem.hse.ru/hubman/hubman-lib/core"
 	"github.com/jsimonetti/go-artnet"
 )
 
-func NewArtNetDevice(ctx context.Context, conf config.ArtNetConfig) (device.Device, error) {
+func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.ArtNetConfig) (device.Device, error) {
 	log := artnet.NewDefaultLogger()
 	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
@@ -29,6 +30,7 @@ type artnetDevice struct {
 	universe     [512]byte
 	scenes       map[string]device.Scene
 	currentScene *device.Scene
+	signals      chan core.Signal
 }
 
 func (d *artnetDevice) GetAlias() string {
@@ -53,18 +55,28 @@ func (d *artnetDevice) SetUniverse(universe []config.ChannelRange) {
 	}
 }
 
+
+func (d *artnetDevice) SetScene(sceneAlias string) error {
+	scene, ok := d.scenes[sceneAlias]
+	if !ok {
+		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
+	}
+	d.currentScene = &scene
+
+	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
+	return nil
+}
+
 func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
-		err := d.WriteValueToChannel(ctx, command)
-		if err != nil {
-			return err
-		}
-		return nil
+		return fmt.Errorf("no scene is selected")
 	}
 	_, ok := d.currentScene.ChannelMap[command.Channel]
 	if !ok {
 		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
 	}
+	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(ctx, command)
 	if err != nil {
 		return err
@@ -77,7 +89,6 @@ func (d *artnetDevice) WriteValueToChannel(ctx context.Context, command models.S
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	d.universe[command.Channel] = byte(command.Value)
 	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
 
 	return nil

@@ -36,11 +36,16 @@ func main() {
 	logger := app.Logger()
 
 	manager := internal.NewManager(logger)
+	signals := manager.GetSignals()
 
 	app.RegisterPlugin(
 		hubman.NewAgentPlugin(
 			app.Logger(),
 			agentConf,
+			hubman.WithManipulator(
+				hubman.WithSignal[models.SceneChanged](),
+				hubman.WithChannel(signals),
+			),
 			hubman.WithExecutor(
 				hubman.WithCommand(models.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
 					var cmd models.SetChannel // json-like api
