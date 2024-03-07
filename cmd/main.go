@@ -44,6 +44,7 @@ func main() {
 			agentConf,
 			hubman.WithManipulator(
 				hubman.WithSignal[models.SceneChanged](),
+				hubman.WithSignal[models.SceneSaved](),
 				hubman.WithChannel(signals),
 			),
 			hubman.WithExecutor(

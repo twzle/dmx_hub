@@ -20,6 +20,8 @@ type Scene struct {
 type Device interface {
 	GetAlias() string
 	SetUniverse(universe []config.ChannelRange)
+	SetScene(sceneAlias string) error
+	SaveScene()
 	SetChannel(ctx context.Context, command models.SetChannel) error
 	WriteValueToChannel(ctx context.Context, command models.SetChannel) error
 	Blackout(ctx context.Context) error

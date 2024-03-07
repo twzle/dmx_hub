@@ -66,10 +66,20 @@ func (d *dmxDevice) SetScene(sceneAlias string) error {
 		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
 	}
 	d.currentScene = &scene
-	
+
 	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
 	return nil
+}
+
+func (d *dmxDevice) SaveScene() {
+	for sceneChannelID, channel := range d.currentScene.ChannelMap {
+		channel.Value = int(d.universe[channel.UniverseChannelID])
+		d.currentScene.ChannelMap[sceneChannelID] = channel
+	}
+	
+	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
 }
 
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {

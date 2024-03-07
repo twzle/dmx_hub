@@ -68,6 +68,16 @@ func (d *artnetDevice) SetScene(sceneAlias string) error {
 	return nil
 }
 
+func (d *artnetDevice) SaveScene() {
+	for sceneChannelID, channel := range d.currentScene.ChannelMap {
+		channel.Value = int(d.universe[channel.UniverseChannelID])
+		d.currentScene.ChannelMap[sceneChannelID] = channel
+	}
+	
+	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
+}
+
 func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
 		return fmt.Errorf("no scene is selected")
