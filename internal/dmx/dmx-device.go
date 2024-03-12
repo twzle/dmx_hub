@@ -20,6 +20,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
 	newDMX.SetUniverse(ctx, conf.Universe)
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
+	newDMX.signals = signals
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
 
 	if err != nil {
@@ -72,8 +73,8 @@ func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
 		d.WriteValueToChannel(ctx, models.SetChannel{Channel: channel.UniverseChannelID, Value: channel.Value, DeviceAlias: d.alias})
 	}
 
-	// signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
-	// d.signals <- signal
+	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
 	return nil
 }
 
@@ -83,8 +84,8 @@ func (d *dmxDevice) SaveScene(ctx context.Context) {
 		d.currentScene.ChannelMap[sceneChannelID] = channel
 	}
 	
-	// signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
-	// d.signals <- signal
+	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	d.signals <- signal
 }
 
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
