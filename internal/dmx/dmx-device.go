@@ -18,7 +18,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 	}
 
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
-	newDMX.SetUniverse(ctx, conf.Universe)
+	newDMX.SetUniverse(ctx, [512]byte{})
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newDMX.signals = signals
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
@@ -43,22 +43,8 @@ func (d *dmxDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *dmxDevice) SetUniverse(ctx context.Context, universe []config.ChannelRange) {
-	dmxUniverse := make(map[uint16]uint16, len(universe))
-	for _, channelRange := range universe {
-		dmxUniverse[channelRange.InitialIndex] = channelRange.Value
-	}
-
-	var channelValue uint16
-	for idx, channel := range d.universe {
-		value, ok := dmxUniverse[uint16(idx)]
-		if ok {
-			channelValue = value
-		}
-
-		channel = byte(channelValue)
-		d.universe[idx] = channel
-	}
+func (d *dmxDevice) SetUniverse(ctx context.Context, universe [512]byte) {
+	d.universe = universe
 }
 
 func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {

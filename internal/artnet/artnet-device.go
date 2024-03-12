@@ -18,7 +18,7 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.
 	dev.Start()
 
 	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev}
-	newArtNet.SetUniverse(ctx, conf.Universe)
+	newArtNet.SetUniverse(ctx, [512]byte{})
 	newArtNet.signals = signals
 	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
@@ -40,22 +40,8 @@ func (d *artnetDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *artnetDevice) SetUniverse(ctx context.Context, universe []config.ChannelRange) {
-	artNetUniverse := make(map[uint16]uint16, len(universe))
-	for _, channelRange := range universe {
-		artNetUniverse[channelRange.InitialIndex] = channelRange.Value
-	}
-
-	var channelValue uint16
-	for idx, channel := range d.universe {
-		value, ok := artNetUniverse[uint16(idx)]
-		if ok {
-			channelValue = value
-		}
-
-		channel = byte(channelValue)
-		d.universe[idx] = channel
-	}
+func (d *artnetDevice) SetUniverse(ctx context.Context, universe [512]byte) {
+	d.universe = universe
 }
 
 

@@ -18,22 +18,15 @@ type Scene struct {
 	ChannelMap []ChannelMap `json:"channel_map" yaml:"channel_map"`
 }
 
-type ChannelRange struct {
-	InitialIndex uint16 `json:"initial_index" yaml:"initial_index"`
-	Value        uint16 `json:"value" yaml:"value"`
-}
-
 type ArtNetConfig struct {
 	Alias    string         `json:"alias" yaml:"alias"`
 	IP       net.IP         `json:"ip" yaml:"ip"`
-	Universe []ChannelRange `json:"universe" yaml:"universe"`
 	Scenes   []Scene		`json:"scenes" yaml:"scenes"`
 }
 
 type DMXConfig struct {
 	Alias    string         `json:"alias" yaml:"alias"`
 	Path     string         `json:"path" yaml:"path"`
-	Universe []ChannelRange `json:"universe" yaml:"universe"`
 	Scenes   []Scene		`json:"scenes" yaml:"scenes"`
 }
 
