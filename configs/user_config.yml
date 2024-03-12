@@ -36,3 +36,9 @@ artnet_devices:
          universe_channel_id: 17   
       -  scene_channel_id: 7
          universe_channel_id: 18
+    - scene_alias: "scene 2"
+      channel_map:
+      -  scene_channel_id: 0
+         universe_channel_id: 20
+      -  scene_channel_id: 1
+         universe_channel_id: 25      

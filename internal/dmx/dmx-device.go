@@ -18,7 +18,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 	}
 
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
-	newDMX.SetUniverse(conf.Universe)
+	newDMX.SetUniverse(ctx, conf.Universe)
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
 
@@ -42,7 +42,7 @@ func (d *dmxDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *dmxDevice) SetUniverse(universe []config.ChannelRange) {
+func (d *dmxDevice) SetUniverse(ctx context.Context, universe []config.ChannelRange) {
 	dmxUniverse := make(map[uint16]uint16, len(universe))
 	for _, channelRange := range universe {
 		dmxUniverse[channelRange.InitialIndex] = channelRange.Value
@@ -60,36 +60,42 @@ func (d *dmxDevice) SetUniverse(universe []config.ChannelRange) {
 	}
 }
 
-func (d *dmxDevice) SetScene(sceneAlias string) error {
+func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	scene, ok := d.scenes[sceneAlias]
 	if !ok {
 		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
 	}
 	d.currentScene = &scene
 
-	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
-	d.signals <- signal
+	for _, channel := range d.currentScene.ChannelMap {
+		d.universe[channel.UniverseChannelID] = byte(channel.Value)
+		d.WriteValueToChannel(ctx, models.SetChannel{Channel: channel.UniverseChannelID, Value: channel.Value, DeviceAlias: d.alias})
+	}
+
+	// signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	// d.signals <- signal
 	return nil
 }
 
-func (d *dmxDevice) SaveScene() {
+func (d *dmxDevice) SaveScene(ctx context.Context) {
 	for sceneChannelID, channel := range d.currentScene.ChannelMap {
 		channel.Value = int(d.universe[channel.UniverseChannelID])
 		d.currentScene.ChannelMap[sceneChannelID] = channel
 	}
 	
-	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
-	d.signals <- signal
+	// signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	// d.signals <- signal
 }
 
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
 		return fmt.Errorf("no scene is selected")
 	}
-	_, ok := d.currentScene.ChannelMap[command.Channel]
+	channel, ok := d.currentScene.ChannelMap[command.Channel]
 	if !ok {
 		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
 	}
+	command.Channel = channel.UniverseChannelID
 	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(ctx, command)
 	if err != nil {
@@ -102,7 +108,6 @@ func (d *dmxDevice) WriteValueToChannel(ctx context.Context, command models.SetC
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	d.universe[command.Channel] = byte(command.Value)
 	err := d.dev.SetChannel(command.Channel, byte(command.Value))
 	if err != nil {
 		return fmt.Errorf("setting value to channel error: %v", err)

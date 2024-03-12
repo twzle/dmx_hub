@@ -83,6 +83,7 @@ func main() {
 		),
 	)
 
+
 	manager.UpdateDevices(ctx, *userConfig)
 	<-app.WaitShutdown()
 	os.Exit(0)
