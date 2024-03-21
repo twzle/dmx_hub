@@ -3,7 +3,6 @@ package artnet
 import (
 	"context"
 	"fmt"
-	// "log"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
@@ -17,8 +16,8 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.
 	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
 
-	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev}
-	newArtNet.SetUniverse(ctx, [512]byte{})
+	newArtNet := &artnetDevice{}
+	newArtNet.GetUniverseFromCache(ctx)
 	newArtNet.signals = signals
 	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
@@ -40,8 +39,23 @@ func (d *artnetDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *artnetDevice) SetUniverse(ctx context.Context, universe [512]byte) {
-	d.universe = universe
+func (d *artnetDevice) GetUniverseFromCache(ctx context.Context) error {
+	var err error
+	d.universe, err = device.ReadUnvierse(ctx, d.alias)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *artnetDevice) SaveUniverseToCache(ctx context.Context) error {
+	err := device.WriteUniverse(ctx, d.alias, d.universe[:])
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 
@@ -50,6 +64,7 @@ func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	if !ok {
 		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
 	}
+
 	d.currentScene = &scene
 
 	for _, channel := range d.currentScene.ChannelMap {
@@ -63,7 +78,11 @@ func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	return nil
 }
 
-func (d *artnetDevice) SaveScene(ctx context.Context) {
+func (d *artnetDevice) SaveScene(ctx context.Context) error {
+	if d.currentScene == nil {
+		return fmt.Errorf("no scene is selected")
+	}
+
 	for sceneChannelID, channel := range d.currentScene.ChannelMap {
 		channel.Value = int(d.universe[channel.UniverseChannelID])
 		d.currentScene.ChannelMap[sceneChannelID] = channel
@@ -71,22 +90,31 @@ func (d *artnetDevice) SaveScene(ctx context.Context) {
 	
 	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
+
+	return nil
 }
 
 func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
 		return fmt.Errorf("no scene is selected")
 	}
+
 	channel, ok := d.currentScene.ChannelMap[command.Channel]
 	if !ok {
 		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
 	}
+
 	command.Channel = channel.UniverseChannelID
 	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(ctx, command)
 	if err != nil {
 		return err
 	}
+	err = d.SaveUniverseToCache(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -103,6 +131,10 @@ func (d *artnetDevice) WriteValueToChannel(ctx context.Context, command models.S
 func (d *artnetDevice) Blackout(ctx context.Context) error {
 	d.universe = [512]byte{}
 	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
+	err := d.SaveUniverseToCache(ctx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

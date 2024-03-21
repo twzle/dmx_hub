@@ -4,7 +4,7 @@ dmx_devices:
     scenes:   
 artnet_devices:
   - alias: Artnet1
-    ip: "127.0.0.1"
+    ip: "172.18.191.119"
     scenes:
     - scene_alias: "scene 1"
       channel_map:

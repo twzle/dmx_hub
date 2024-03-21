@@ -3,6 +3,8 @@ package dmx
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"git.miem.hse.ru/hubman/hubman-lib/core"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
@@ -18,9 +20,10 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 	}
 
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
-	newDMX.SetUniverse(ctx, [512]byte{})
+	newDMX.GetUniverseFromCache(ctx)
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 	newDMX.signals = signals
+
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
 
 	if err != nil {
@@ -43,8 +46,24 @@ func (d *dmxDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *dmxDevice) SetUniverse(ctx context.Context, universe [512]byte) {
-	d.universe = universe
+func (d *dmxDevice) GetUniverseFromCache(ctx context.Context) error {
+	var err error
+	d.universe, err = device.ReadUnvierse(ctx, d.alias)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (d *dmxDevice) SaveUniverseToCache(ctx context.Context) error {
+	err := device.WriteUniverse(ctx, d.alias, d.universe[:])
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
@@ -64,7 +83,11 @@ func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	return nil
 }
 
-func (d *dmxDevice) SaveScene(ctx context.Context) {
+func (d *dmxDevice) SaveScene(ctx context.Context) error {
+	if d.currentScene == nil {
+		return fmt.Errorf("no scene is selected")
+	}
+
 	for sceneChannelID, channel := range d.currentScene.ChannelMap {
 		channel.Value = int(d.universe[channel.UniverseChannelID])
 		d.currentScene.ChannelMap[sceneChannelID] = channel
@@ -72,12 +95,15 @@ func (d *dmxDevice) SaveScene(ctx context.Context) {
 	
 	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
+	
+	return nil
 }
 
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	if d.currentScene == nil {
 		return fmt.Errorf("no scene is selected")
 	}
+
 	channel, ok := d.currentScene.ChannelMap[command.Channel]
 	if !ok {
 		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
@@ -85,6 +111,10 @@ func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) e
 	command.Channel = channel.UniverseChannelID
 	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(ctx, command)
+	if err != nil {
+		return err
+	}
+	err = d.SaveUniverseToCache(ctx)
 	if err != nil {
 		return err
 	}
@@ -113,6 +143,9 @@ func (d *dmxDevice) Blackout(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("sending frame to dev error: %v", err)
 	}
-
+	err = d.SaveUniverseToCache(ctx)
+	if err != nil {
+		return err
+	}
 	return nil
 }
