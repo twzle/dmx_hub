@@ -1,7 +1,31 @@
 dmx_devices:
   - alias: DMX1
-    path: "COM1"
-    scenes:   
+    path: "COM1" 
+    scenes:
+    - scene_alias: "scene 1"
+      channel_map:
+      -  scene_channel_id: 0
+         universe_channel_id: 11
+      -  scene_channel_id: 1
+         universe_channel_id: 12
+      -  scene_channel_id: 2
+         universe_channel_id: 13   
+      -  scene_channel_id: 3
+         universe_channel_id: 14
+      -  scene_channel_id: 4
+         universe_channel_id: 15
+      -  scene_channel_id: 5
+         universe_channel_id: 16
+      -  scene_channel_id: 6
+         universe_channel_id: 17   
+      -  scene_channel_id: 7
+         universe_channel_id: 18
+    - scene_alias: "scene 2"
+      channel_map:
+      -  scene_channel_id: 0
+         universe_channel_id: 20
+      -  scene_channel_id: 1
+         universe_channel_id: 25 
 artnet_devices:
   - alias: Artnet1
     ip: "172.18.191.119"

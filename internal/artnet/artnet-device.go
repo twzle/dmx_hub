@@ -3,6 +3,7 @@ package artnet
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
@@ -16,12 +17,12 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.
 	dev := artnet.NewController(conf.Alias, conf.IP, log)
 	dev.Start()
 
-	newArtNet := &artnetDevice{}
-	newArtNet.GetUniverseFromCache(ctx)
-	newArtNet.signals = signals
+	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev, signals: signals}
 	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
-	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
 
+	newArtNet.GetUniverseFromCache(ctx)
+	newArtNet.GetScenesFromCache(ctx)
+	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
 
 	return newArtNet, nil
 }
@@ -39,25 +40,31 @@ func (d *artnetDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *artnetDevice) GetUniverseFromCache(ctx context.Context) error {
+func (d *artnetDevice) GetUniverseFromCache(ctx context.Context){
 	var err error
 	d.universe, err = device.ReadUnvierse(ctx, d.alias)
 	if err != nil {
-		return err
+		log.Println(err)
 	}
-
-	return nil
 }
 
-func (d *artnetDevice) SaveUniverseToCache(ctx context.Context) error {
+func (d *artnetDevice) SaveUniverseToCache(ctx context.Context){
 	err := device.WriteUniverse(ctx, d.alias, d.universe[:])
 	if err != nil {
-		return err
+		log.Println(err)
 	}
-
-	return nil
 }
 
+func (d *artnetDevice) GetScenesFromCache(ctx context.Context){
+	d.scenes = device.ReadScenes(ctx, d.alias, d.scenes)
+}
+
+func (d *artnetDevice) SaveScenesToCache(ctx context.Context) {
+	err := device.WriteScenes(ctx, d.alias, d.scenes)
+	if err != nil {
+		log.Println("save scenes to cache failed with error: ", err)
+	}
+}
 
 func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	scene, ok := d.scenes[sceneAlias]
@@ -72,6 +79,7 @@ func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	}
 
 	d.WriteValueToChannel(ctx, models.SetChannel{})
+	d.SaveUniverseToCache(ctx)
 
 	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
@@ -87,6 +95,7 @@ func (d *artnetDevice) SaveScene(ctx context.Context) error {
 		channel.Value = int(d.universe[channel.UniverseChannelID])
 		d.currentScene.ChannelMap[sceneChannelID] = channel
 	}
+	d.SaveScenesToCache(ctx)
 	
 	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
@@ -110,11 +119,7 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 	if err != nil {
 		return err
 	}
-	err = d.SaveUniverseToCache(ctx)
-	if err != nil {
-		return err
-	}
-
+	d.SaveUniverseToCache(ctx)
 	return nil
 }
 
@@ -131,10 +136,6 @@ func (d *artnetDevice) WriteValueToChannel(ctx context.Context, command models.S
 func (d *artnetDevice) Blackout(ctx context.Context) error {
 	d.universe = [512]byte{}
 	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
-	err := d.SaveUniverseToCache(ctx)
-	if err != nil {
-		return err
-	}
-
+	d.SaveUniverseToCache(ctx)
 	return nil
 }

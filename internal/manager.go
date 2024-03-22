@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+
 	"git.miem.hse.ru/hubman/hubman-lib/core"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/artnet"

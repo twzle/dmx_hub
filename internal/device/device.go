@@ -2,12 +2,14 @@ package device
 
 import (
 	"context"
+	"log"
+
+	"fmt"
+	"strconv"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"github.com/redis/go-redis/v9"
-	"fmt"
-	"strconv"
 )
 
 type Channel struct {
@@ -22,8 +24,10 @@ type Scene struct {
 
 type Device interface {
 	GetAlias() string
-	GetUniverseFromCache(ctx context.Context) error
-	SaveUniverseToCache(ctx context.Context) error
+	GetUniverseFromCache(ctx context.Context)
+	SaveUniverseToCache(ctx context.Context)
+	GetScenesFromCache(ctx context.Context)
+	SaveScenesToCache(ctx context.Context)
 	SetScene(ctx context.Context, sceneAlias string) error
 	SaveScene(ctx context.Context) error
 	SetChannel(ctx context.Context, command models.SetChannel) error
@@ -72,12 +76,12 @@ func ReadUnvierse(ctx context.Context, deviceAlias string) ([512]byte, error) {
 
 	encodedUniverse, err := rdb.Get(ctx, key).Result()
 	if err != nil {
-		return [512]byte{}, err
+		return [512]byte{}, fmt.Errorf("reading cached universe with key '%s' failed with error: %s", key, err)
 	}
 
-	universe, err = DecodeRLE(encodedUniverse)
+	universe, err = DecodeUniverse(encodedUniverse)
 	if err != nil {
-		return [512]byte{}, err
+		return [512]byte{}, fmt.Errorf("universe with key '%s' decoding failed with error: %s", key, err)
 	}
 
 	return universe, nil
@@ -91,17 +95,67 @@ func WriteUniverse(ctx context.Context, deviceAlias string, universe []byte) err
 	})
 
 	key := fmt.Sprintf("%s_universe", deviceAlias)
-	var encodedUniverse = EncodeRLE(universe, 512)
+	var encodedUniverse = EncodeUniverse(universe, 512)
 
 	_, err := rdb.Set(ctx, key, encodedUniverse, 0).Result()
 	if err != nil {
-		return err
+		return fmt.Errorf("writing universe with key '%s' to cache failed with error: %s", key, err)
 	}
 	
 	return nil
 }
 
-func DecodeRLE(sequence string) ([512]byte, error) {
+
+func ReadScenes(ctx context.Context, deviceAlias string, deviceScenes map[string]Scene) map[string]Scene {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+	
+	encodedScenesMap := make(map[string]string)
+
+	for sceneAlias, _ := range deviceScenes {
+		key := fmt.Sprintf("%s_scene_%s", deviceAlias, sceneAlias)
+		encodedScene, err := rdb.Get(ctx, key).Result()
+		if err != nil {
+			log.Printf("scene with key '%s' was not found in cache: %s", key, err)
+			continue
+		}
+		encodedScenesMap[sceneAlias] = encodedScene
+	}
+
+	for sceneAlias, encodedScene := range encodedScenesMap {
+		decodedScene, _ := DecodeScene(encodedScene)
+		decodedScene.Alias = sceneAlias
+		deviceScenes[sceneAlias] = decodedScene
+	}
+
+	return deviceScenes
+}
+
+func WriteScenes(ctx context.Context, deviceAlias string, deviceScenes map[string]Scene) error {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	for sceneAlias, scene := range deviceScenes {
+
+		key := fmt.Sprintf("%s_scene_%s", deviceAlias, sceneAlias)
+		var encodedScene = EncodeScene(scene)
+
+		_, err := rdb.Set(ctx, key, encodedScene, 0).Result()
+		if err != nil {
+			return fmt.Errorf("writing universe with key '%s' to cache failed with error: %s", key, err)
+		}
+	}
+	
+	return nil
+}
+
+func DecodeUniverse(sequence string) ([512]byte, error) {
 	var universe [512]byte
 	size := len(sequence)
 	if size % 9 != 0 {
@@ -143,7 +197,6 @@ func DecodeRLE(sequence string) ([512]byte, error) {
 			return [512]byte{}, fmt.Errorf("got invalid RLE sequence (previousLastChannel > currentInitialChannel)")
 		}
 
-		fmt.Println(initialChannel, lastChannel)
 		for j := initialChannel; j <= lastChannel; j++ {
 			universe[j] = byte(channelValue)
 		} 
@@ -154,7 +207,7 @@ func DecodeRLE(sequence string) ([512]byte, error) {
 	return universe, nil
 }
 
-func EncodeRLE(sequence []byte, size int) string {
+func EncodeUniverse(sequence []byte, size int) string {
 	var result string
 	var currentChannelValue int = int(sequence[0])
 	var sequenceStart int = 0
@@ -170,4 +223,56 @@ func EncodeRLE(sequence []byte, size int) string {
 	}
 
 	return result
+}
+
+func EncodeScene(scene Scene) string {
+	var result string
+
+	for sceneChannelID, channel := range scene.ChannelMap {
+		result += fmt.Sprintf("%03d", sceneChannelID) + fmt.Sprintf("%03d", channel.UniverseChannelID) + fmt.Sprintf("%03d", channel.Value)
+	}
+
+	return result
+}
+
+func DecodeScene(sequence string) (Scene, error) {
+	var result Scene
+	result.ChannelMap = make(map[int]Channel)
+
+	size := len(sequence)
+	if size % 9 != 0 {
+		return Scene{}, fmt.Errorf("got invalid RLE sequence size")
+	}
+
+	for i := 0; i < size; i+=9 {
+		sceneChannelID, err := strconv.Atoi(sequence[i:i+3])
+		if err != nil {
+			return Scene{}, nil
+		}
+
+		universeChannelID, err := strconv.Atoi(sequence[i+3:i+6])
+		if err != nil {
+			return Scene{}, nil
+		}
+
+		channelValue, err := strconv.Atoi(sequence[i+6:i+9])
+		if err != nil {
+			return Scene{}, nil
+		}
+
+		if sceneChannelID < 0 || sceneChannelID > 511 {
+			return Scene{}, fmt.Errorf("scene channel out of range [0:511]")
+		}
+
+		if universeChannelID < 0 || universeChannelID > 511 {
+			return Scene{}, fmt.Errorf("universe channel out of range [0:511]")
+		}
+
+		if channelValue < 0 || channelValue > 511 {
+			return Scene{}, fmt.Errorf("channel value out of range [0:511]")
+		}
+
+		result.ChannelMap[sceneChannelID] = Channel{UniverseChannelID: universeChannelID, Value: channelValue}
+	}
+	return result, nil
 }

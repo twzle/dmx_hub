@@ -20,10 +20,10 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 	}
 
 	newDMX := &dmxDevice{alias: conf.Alias, dev: dev, signals: signals}
-	newDMX.GetUniverseFromCache(ctx)
 	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
-	newDMX.signals = signals
 
+	newDMX.GetUniverseFromCache(ctx)
+	newDMX.GetScenesFromCache(ctx)
 	newDMX.currentScene = device.GetSceneById(newDMX.scenes, 0)
 
 	if err != nil {
@@ -46,24 +46,30 @@ func (d *dmxDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *dmxDevice) GetUniverseFromCache(ctx context.Context) error {
+func (d *dmxDevice) GetUniverseFromCache(ctx context.Context) {
 	var err error
 	d.universe, err = device.ReadUnvierse(ctx, d.alias)
 	if err != nil {
-		log.Println(err)
-		return err
+		log.Println("get universe from cache failed with error: ", err)
 	}
-
-	return nil
 }
 
-func (d *dmxDevice) SaveUniverseToCache(ctx context.Context) error {
+func (d *dmxDevice) SaveUniverseToCache(ctx context.Context) {
 	err := device.WriteUniverse(ctx, d.alias, d.universe[:])
 	if err != nil {
-		return err
+		log.Println("save universe to cache failed with error: ", err)
 	}
+}
 
-	return nil
+func (d *dmxDevice) GetScenesFromCache(ctx context.Context){
+	d.scenes = device.ReadScenes(ctx, d.alias, d.scenes)
+}
+
+func (d *dmxDevice) SaveScenesToCache(ctx context.Context) {
+	err := device.WriteScenes(ctx, d.alias, d.scenes)
+	if err != nil {
+		log.Println("save scenes to cache failed with error: ", err)
+	}
 }
 
 func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
@@ -77,6 +83,7 @@ func (d *dmxDevice) SetScene(ctx context.Context, sceneAlias string) error {
 		d.universe[channel.UniverseChannelID] = byte(channel.Value)
 		d.WriteValueToChannel(ctx, models.SetChannel{Channel: channel.UniverseChannelID, Value: channel.Value, DeviceAlias: d.alias})
 	}
+	d.SaveUniverseToCache(ctx)
 
 	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
@@ -92,6 +99,7 @@ func (d *dmxDevice) SaveScene(ctx context.Context) error {
 		channel.Value = int(d.universe[channel.UniverseChannelID])
 		d.currentScene.ChannelMap[sceneChannelID] = channel
 	}
+	d.SaveScenesToCache(ctx)
 	
 	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
 	d.signals <- signal
@@ -114,10 +122,7 @@ func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) e
 	if err != nil {
 		return err
 	}
-	err = d.SaveUniverseToCache(ctx)
-	if err != nil {
-		return err
-	}
+	d.SaveUniverseToCache(ctx)
 	return nil
 }
 
@@ -143,9 +148,6 @@ func (d *dmxDevice) Blackout(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("sending frame to dev error: %v", err)
 	}
-	err = d.SaveUniverseToCache(ctx)
-	if err != nil {
-		return err
-	}
+	d.SaveUniverseToCache(ctx)
 	return nil
 }
