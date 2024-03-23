@@ -21,6 +21,7 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.
 	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
 
 	newArtNet.GetUniverseFromCache(ctx)
+	newArtNet.WriteUniverseToDevice()
 	newArtNet.GetScenesFromCache(ctx)
 	newArtNet.currentScene = device.GetSceneById(newArtNet.scenes, 0)
 
@@ -78,7 +79,7 @@ func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 		d.universe[channel.UniverseChannelID] = byte(channel.Value)
 	}
 
-	d.WriteValueToChannel(ctx, models.SetChannel{})
+	d.WriteValueToChannel(models.SetChannel{})
 	d.SaveUniverseToCache(ctx)
 
 	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
@@ -115,7 +116,7 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 
 	command.Channel = channel.UniverseChannelID
 	d.universe[command.Channel] = byte(command.Value)
-	err := d.WriteValueToChannel(ctx, command)
+	err := d.WriteValueToChannel(command)
 	if err != nil {
 		return err
 	}
@@ -123,8 +124,12 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 	return nil
 }
 
+func (d *artnetDevice) WriteUniverseToDevice() error {
+	d.dev.SendDMXToAddress(d.universe, artnet.Address{Net: 0, SubUni: 0})
+	return nil
+}
 
-func (d *artnetDevice) WriteValueToChannel(ctx context.Context, command models.SetChannel) error {
+func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}

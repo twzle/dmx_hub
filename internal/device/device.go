@@ -31,7 +31,8 @@ type Device interface {
 	SetScene(ctx context.Context, sceneAlias string) error
 	SaveScene(ctx context.Context) error
 	SetChannel(ctx context.Context, command models.SetChannel) error
-	WriteValueToChannel(ctx context.Context, command models.SetChannel) error
+	WriteValueToChannel(command models.SetChannel) error
+	WriteUniverseToDevice() error
 	Blackout(ctx context.Context) error
 }
 
