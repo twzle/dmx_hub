@@ -105,6 +105,19 @@ func (m *manager) ProcessSetChannel(ctx context.Context, command models.SetChann
 	return nil
 }
 
+func (m *manager) ProcessIncrementChannel(ctx context.Context, command models.IncrementChannel) error {
+	dev, err := m.checkDevice(command.DeviceAlias)
+	if err != nil {
+		return err
+	}
+
+	err = dev.IncrementChannel(ctx, command)
+	if err != nil {
+		return fmt.Errorf("device with alias %v setting value error: %v", dev.GetAlias(), err)
+	}
+	return nil
+}
+
 func (m *manager) ProcessBlackout(ctx context.Context, command models.Blackout) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -112,6 +125,32 @@ func (m *manager) ProcessBlackout(ctx context.Context, command models.Blackout) 
 	}
 
 	err = dev.Blackout(ctx)
+	if err != nil {
+		return fmt.Errorf("device with alias %v blackout error: %v", dev.GetAlias(), err)
+	}
+	return nil
+}
+
+func (m *manager) ProcessSetScene(ctx context.Context, command models.SetScene) error {
+	dev, err := m.checkDevice(command.DeviceAlias)
+	if err != nil {
+		return err
+	}
+
+	err = dev.SetScene(ctx, command)
+	if err != nil {
+		return fmt.Errorf("device with alias %v blackout error: %v", dev.GetAlias(), err)
+	}
+	return nil
+}
+
+func (m *manager) ProcessSaveScene(ctx context.Context, command models.SaveScene) error {
+	dev, err := m.checkDevice(command.DeviceAlias)
+	if err != nil {
+		return err
+	}
+
+	err = dev.SaveScene(ctx)
 	if err != nil {
 		return fmt.Errorf("device with alias %v blackout error: %v", dev.GetAlias(), err)
 	}

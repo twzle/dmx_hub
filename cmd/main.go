@@ -25,7 +25,6 @@ func main() {
 	}
 	ctx := context.Background()
 
-
 	agentConf := core.AgentConfiguration{
 		System:          systemConfig,
 		User:            userConfig,
@@ -50,18 +49,45 @@ func main() {
 			hubman.WithExecutor(
 				hubman.WithCommand(models.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
 					var cmd models.SetChannel // json-like api
-					parser(&cmd)                // enriches your command with data from redis
+					parser(&cmd)              // enriches your command with data from redis
 
 					err := manager.ProcessSetChannel(ctx, cmd)
 					if err != nil {
 						logger.Error(fmt.Sprintf("error while execute move command: %v", err))
 					}
 				}),
+				hubman.WithCommand(models.IncrementChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd models.IncrementChannel // json-like api
+					parser(&cmd)                    // enriches your command with data from redis
+
+					err := manager.ProcessIncrementChannel(ctx, cmd)
+					if err != nil {
+						logger.Error(fmt.Sprintf("error while execute move command: %v", err))
+					}
+				}),
 				hubman.WithCommand(models.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
 					var cmd models.Blackout // json-like api
-					parser(&cmd)              // enriches your command with data from redis
+					parser(&cmd)            // enriches your command with data from redis
 
 					err := manager.ProcessBlackout(ctx, cmd)
+					if err != nil {
+						logger.Error(fmt.Sprintf("error while execute update speed command: %v", err))
+					}
+				}),
+				hubman.WithCommand(models.SetScene{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd models.SetScene // json-like api
+					parser(&cmd)            // enriches your command with data from redis
+
+					err := manager.ProcessSetScene(ctx, cmd)
+					if err != nil {
+						logger.Error(fmt.Sprintf("error while execute update speed command: %v", err))
+					}
+				}),
+				hubman.WithCommand(models.SaveScene{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+					var cmd models.SaveScene // json-like api
+					parser(&cmd)             // enriches your command with data from redis
+
+					err := manager.ProcessSaveScene(ctx, cmd)
 					if err != nil {
 						logger.Error(fmt.Sprintf("error while execute update speed command: %v", err))
 					}
@@ -82,7 +108,6 @@ func main() {
 			}),
 		),
 	)
-
 
 	manager.UpdateDevices(ctx, *userConfig)
 	<-app.WaitShutdown()

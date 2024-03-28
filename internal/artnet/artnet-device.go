@@ -41,7 +41,7 @@ func (d *artnetDevice) GetAlias() string {
 	return d.alias
 }
 
-func (d *artnetDevice) GetUniverseFromCache(ctx context.Context){
+func (d *artnetDevice) GetUniverseFromCache(ctx context.Context) {
 	var err error
 	d.universe, err = device.ReadUnvierse(ctx, d.alias)
 	if err != nil {
@@ -49,14 +49,14 @@ func (d *artnetDevice) GetUniverseFromCache(ctx context.Context){
 	}
 }
 
-func (d *artnetDevice) SaveUniverseToCache(ctx context.Context){
+func (d *artnetDevice) SaveUniverseToCache(ctx context.Context) {
 	err := device.WriteUniverse(ctx, d.alias, d.universe[:])
 	if err != nil {
 		log.Println(err)
 	}
 }
 
-func (d *artnetDevice) GetScenesFromCache(ctx context.Context){
+func (d *artnetDevice) GetScenesFromCache(ctx context.Context) {
 	d.scenes = device.ReadScenes(ctx, d.alias, d.scenes)
 }
 
@@ -67,10 +67,10 @@ func (d *artnetDevice) SaveScenesToCache(ctx context.Context) {
 	}
 }
 
-func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
-	scene, ok := d.scenes[sceneAlias]
+func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) error {
+	scene, ok := d.scenes[command.SceneAlias]
 	if !ok {
-		return fmt.Errorf("invalid scene alias '%s' for device '%s'", sceneAlias, d.alias)
+		return fmt.Errorf("invalid scene alias '%s' for device '%s'", command.SceneAlias, command.DeviceAlias)
 	}
 
 	d.currentScene = &scene
@@ -82,7 +82,9 @@ func (d *artnetDevice) SetScene(ctx context.Context, sceneAlias string) error {
 	d.WriteValueToChannel(models.SetChannel{})
 	d.SaveUniverseToCache(ctx)
 
-	signal := models.SceneChanged{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+	signal := models.SceneChanged{
+		DeviceAlias: d.alias,
+		SceneAlias:  d.currentScene.Alias}
 	d.signals <- signal
 	return nil
 }
@@ -97,8 +99,10 @@ func (d *artnetDevice) SaveScene(ctx context.Context) error {
 		d.currentScene.ChannelMap[sceneChannelID] = channel
 	}
 	d.SaveScenesToCache(ctx)
-	
-	signal := models.SceneSaved{DeviceAlias: d.alias, SceneAlias: d.currentScene.Alias}
+
+	signal := models.SceneSaved{
+		DeviceAlias: d.alias,
+		SceneAlias:  d.currentScene.Alias}
 	d.signals <- signal
 
 	return nil
@@ -117,6 +121,35 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 	command.Channel = channel.UniverseChannelID
 	d.universe[command.Channel] = byte(command.Value)
 	err := d.WriteValueToChannel(command)
+	if err != nil {
+		return err
+	}
+	d.SaveUniverseToCache(ctx)
+	return nil
+}
+
+func (d *artnetDevice) IncrementChannel(ctx context.Context, command models.IncrementChannel) error {
+	if d.currentScene == nil {
+		return fmt.Errorf("no scene is selected")
+	}
+
+	channel, ok := d.currentScene.ChannelMap[command.Channel]
+	if !ok {
+		return fmt.Errorf("channel '%d' doesn't belong to current scene '%s'", command.Channel, d.currentScene.Alias)
+	}
+
+	command.Channel = channel.UniverseChannelID
+	if ((int(d.universe[command.Channel])+command.Value) < 0 || (int(d.universe[command.Channel])+command.Value) > 255) {
+		return fmt.Errorf("incremented channel value '%d' of range [0, 255]", channel.Value)
+	}
+
+	d.universe[command.Channel] += byte(command.Value)
+	cmd := models.SetChannel{
+		Channel:     command.Channel,
+		Value:       int(d.universe[command.Channel]),
+		DeviceAlias: d.alias}
+
+	err := d.WriteValueToChannel(cmd)
 	if err != nil {
 		return err
 	}

@@ -28,9 +28,10 @@ type Device interface {
 	SaveUniverseToCache(ctx context.Context)
 	GetScenesFromCache(ctx context.Context)
 	SaveScenesToCache(ctx context.Context)
-	SetScene(ctx context.Context, sceneAlias string) error
+	SetScene(ctx context.Context, command models.SetScene) error
 	SaveScene(ctx context.Context) error
 	SetChannel(ctx context.Context, command models.SetChannel) error
+	IncrementChannel(ctx context.Context, command models.IncrementChannel) error
 	WriteValueToChannel(command models.SetChannel) error
 	WriteUniverseToDevice() error
 	Blackout(ctx context.Context) error
@@ -105,7 +106,6 @@ func WriteUniverse(ctx context.Context, deviceAlias string, universe []byte) err
 	
 	return nil
 }
-
 
 func ReadScenes(ctx context.Context, deviceAlias string, deviceScenes map[string]Scene) map[string]Scene {
 	rdb := redis.NewClient(&redis.Options{
