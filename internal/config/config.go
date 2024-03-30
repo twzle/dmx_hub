@@ -1,10 +1,10 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 
-	"gopkg.in/yaml.v3"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 )
 
@@ -87,7 +87,7 @@ func (conf *UserConfig) hasDuplicateDevices() (string, bool) {
 func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
 	cfg := UserConfig{}
 
-	err := yaml.Unmarshal(data, &cfg)
+	err := json.Unmarshal(data, &cfg)
 	if err != nil {
 		return nil, err
 	}
