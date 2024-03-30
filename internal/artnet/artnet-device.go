@@ -18,7 +18,7 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf config.
 	dev.Start()
 
 	newArtNet := &artnetDevice{alias: conf.Alias, dev: dev, signals: signals}
-	newArtNet.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
+	newArtNet.scenes = config.ReadScenesFromDeviceConfig(conf.Scenes)
 
 	newArtNet.GetUniverseFromCache(ctx)
 	newArtNet.WriteUniverseToDevice()

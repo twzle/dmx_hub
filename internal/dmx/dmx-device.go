@@ -23,7 +23,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf config.DMX
 		alias:   conf.Alias,
 		dev:     dev,
 		signals: signals}
-	newDMX.scenes = device.ReadScenesFromDeviceConfig(conf.Scenes)
+	newDMX.scenes = config.ReadScenesFromDeviceConfig(conf.Scenes)
 
 	newDMX.GetUniverseFromCache(ctx)
 	newDMX.WriteUniverseToDevice()

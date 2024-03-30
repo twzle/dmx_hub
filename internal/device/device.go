@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"git.miem.hse.ru/hubman/dmx-executor/internal/config"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"github.com/redis/go-redis/v9"
 )
@@ -35,24 +34,6 @@ type Device interface {
 	WriteValueToChannel(command models.SetChannel) error
 	WriteUniverseToDevice() error
 	Blackout(ctx context.Context) error
-}
-
-func ReadScenesFromDeviceConfig(sceneListConfig []config.Scene) map[string]Scene {
-	scenes := make(map[string]Scene)
-
-	for _, sceneConfig := range sceneListConfig {
-		scene := Scene{Alias: "", ChannelMap: make(map[int]Channel)}
-		for _, channelMap := range sceneConfig.ChannelMap {
-			channel := Channel{
-				UniverseChannelID: int(channelMap.UniverseChannelID), 
-				Value: 0}
-			scene.ChannelMap[int(channelMap.SceneChannelID)] = channel
-		}
-		scene.Alias = sceneConfig.Alias
-		scenes[scene.Alias] = scene
-	}
-
-	return scenes
 }
 
 func GetSceneById(scenes map[string]Scene, sceneId int) (*Scene){

@@ -3,9 +3,9 @@ package config
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"gopkg.in/yaml.v3"
+	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 )
 
 type ChannelMap struct {
@@ -39,11 +39,8 @@ func (conf *UserConfig) Validate() error {
 	if len(conf.DMXDevices) == 0 && len(conf.ArtNetDevices) == 0 {
 		fmt.Println("DMX/ArtNet devices were not found in configuration file")
 	}
-	if alias, has := conf.hasDuplicateDevices("dmx"); has {
+	if alias, has := conf.hasDuplicateDevices(); has {
 		return fmt.Errorf("found duplicate DMX device with alias {%s} in config", alias)
-	}
-	if alias, has := conf.hasDuplicateDevices("artnet"); has {
-		return fmt.Errorf("found duplicate ArtNet device with alias {%s} in config", alias)
 	}
 	for idx, device := range conf.DMXDevices {
 		if device.Alias == "" {
@@ -67,35 +64,24 @@ func (conf *UserConfig) Validate() error {
 	return nil
 }
 
-func (conf *UserConfig) hasDuplicateDevices(protocol string) (string, bool) {
+func (conf *UserConfig) hasDuplicateDevices() (string, bool) {
 	x := make(map[string]struct{})
 
-	if protocol == "dmx" {
-		for _, v := range conf.DMXDevices {
-			if _, has := x[v.Alias]; has {
-				return v.Alias, true
-			}
-			x[v.Alias] = struct{}{}
+	for _, v := range conf.DMXDevices {
+		if _, has := x[v.Alias]; has {
+			return v.Alias, true
 		}
-	} else if protocol == "artnet" {
-		for _, v := range conf.ArtNetDevices {
-			if _, has := x[v.Alias]; has {
-				return v.Alias, true
-			}
-			x[v.Alias] = struct{}{}
+		x[v.Alias] = struct{}{}
+	}
+
+	for _, v := range conf.ArtNetDevices {
+		if _, has := x[v.Alias]; has {
+			return v.Alias, true
 		}
+		x[v.Alias] = struct{}{}
 	}
 
 	return "", false
-}
-
-func InitConfig(confPath string) (*UserConfig, error) {
-	jsonFile, err := os.ReadFile(confPath)
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := ParseConfigFromBytes(jsonFile)
-	return cfg, err
 }
 
 func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
@@ -106,10 +92,23 @@ func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
 		return nil, err
 	}
 
-	err = cfg.Validate()
-	if err != nil {
-		return nil, err
+	return &cfg, nil
+}
+
+func ReadScenesFromDeviceConfig(sceneListConfig []Scene) map[string]device.Scene {
+	scenes := make(map[string]device.Scene)
+
+	for _, sceneConfig := range sceneListConfig {
+		scene := device.Scene{Alias: "", ChannelMap: make(map[int]device.Channel)}
+		for _, channelMap := range sceneConfig.ChannelMap {
+			channel := device.Channel{
+				UniverseChannelID: int(channelMap.UniverseChannelID), 
+				Value: 0}
+			scene.ChannelMap[int(channelMap.SceneChannelID)] = channel
+		}
+		scene.Alias = sceneConfig.Alias
+		scenes[scene.Alias] = scene
 	}
 
-	return &cfg, nil
+	return scenes
 }
