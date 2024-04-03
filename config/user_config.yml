@@ -1,3 +1,0 @@
-dmx_devices:
-  - alias: DMX1
-    path: "/dev/ttyUSB0"
