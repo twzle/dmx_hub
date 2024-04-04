@@ -3,7 +3,7 @@ module git.miem.hse.ru/hubman/dmx-executor
 go 1.21.0
 
 require (
-	git.miem.hse.ru/hubman/hubman-lib v1.0.7
+	git.miem.hse.ru/hubman/hubman-lib v1.0.9
 	github.com/akualab/dmx v0.0.0-20130922234952-1ec6837faba7
 	github.com/jsimonetti/go-artnet v0.0.0-20240201124026-e4f1b1b169f4
 	go.uber.org/zap v1.27.0
