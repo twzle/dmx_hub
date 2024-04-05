@@ -27,66 +27,36 @@ type manager struct {
 	logger  *zap.Logger
 }
 
-func (m *manager) GetSignals() chan core.Signal{
+func (m *manager) GetSignals() chan core.Signal {
 	return m.signals
 }
 
-func (m *manager) UpdateDevices(ctx context.Context, userConfig device.UserConfig) {
-	dmxConfigs := userConfig.DMXDevices
-	artnetDeviceConfig := userConfig.ArtNetDevices
-	dmxSet := make(map[string]bool, len(dmxConfigs))
-	artnetDeviceSet := make(map[string]bool, len(artnetDeviceConfig))
-
-	m.UpdateDMXDevices(ctx, dmxSet, dmxConfigs)
-	m.UpdateArtNetDevices(ctx, artnetDeviceSet, artnetDeviceConfig)
+func (m *manager) GetDevices() map[string]device.Device {
+	return m.devices
 }
 
-func (m *manager) UpdateArtNetDevices(ctx context.Context, artnetDeviceSet map[string]bool, artnetDeviceConfig []device.ArtNetConfig) {
-	for _, dev := range artnetDeviceConfig {
-		artnetDeviceSet[dev.Alias] = true
-	}
+func (m *manager) UpdateDevices(ctx context.Context, userConfig device.UserConfig) {
+	dmxDeviceConfig := userConfig.DMXDevices
+	artnetDeviceConfig := userConfig.ArtNetDevices
 
-	// Deleting the devices that have not been received
 	for alias := range m.devices {
-		if !artnetDeviceSet[alias] {
-			err := m.removeDevice(ctx, alias)
-			if err != nil {
-				m.logger.Error("error with update devices", zap.Error(err), zap.Any("alias", alias))
-			}
+		err := m.removeDevice(ctx, alias)
+		if err != nil {
+			m.logger.Error("error while removing device", zap.Error(err), zap.Any("alias", alias))
 		}
 	}
 
 	for _, conf := range artnetDeviceConfig {
-		if _, exist := m.devices[conf.Alias]; !exist {
-			err := m.addArtNet(ctx, conf)
-			if err != nil {
-				m.logger.Error("error with update devices", zap.Error(err), zap.Any("conf", conf))
-			}
-		}
-	}
-}
-
-func (m *manager) UpdateDMXDevices(ctx context.Context, dmxDeviceSet map[string]bool, dmxDeviceConfig []device.DMXConfig) {
-	for _, dev := range dmxDeviceConfig {
-		dmxDeviceSet[dev.Alias] = true
-	}
-
-	// Deleting the devices that have not been received
-	for alias := range m.devices {
-		if !dmxDeviceSet[alias] {
-			err := m.removeDevice(ctx, alias)
-			if err != nil {
-				m.logger.Error("error with update devices", zap.Error(err), zap.Any("alias", alias))
-			}
+		err := m.addArtNet(ctx, conf)
+		if err != nil {
+			m.logger.Error("error while adding new Artnet device", zap.Error(err), zap.Any("conf", conf))
 		}
 	}
 
 	for _, conf := range dmxDeviceConfig {
-		if _, exist := m.devices[conf.Alias]; !exist {
-			err := m.addDMX(ctx, conf)
-			if err != nil {
-				m.logger.Error("error with update devices", zap.Error(err), zap.Any("conf", conf))
-			}
+		err := m.addDMX(ctx, conf)
+		if err != nil {
+			m.logger.Error("error while adding new DMX device", zap.Error(err), zap.Any("conf", conf))
 		}
 	}
 }
