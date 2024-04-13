@@ -10,24 +10,27 @@ import (
 )
 
 type BaseDevice struct {
-	Alias        string
-	Universe     [512]byte
-	Scenes       map[string]Scene
-	CurrentScene *Scene
-	Signals      chan core.Signal
-	Logger       *zap.Logger
+	Alias               string
+	Universe            [512]byte
+	NonBlackoutChannels map[int]struct{}
+	Scenes              map[string]Scene
+	CurrentScene        *Scene
+	Signals             chan core.Signal
+	Logger              *zap.Logger
 }
 
-func NewBaseDevice(ctx context.Context, alias string, scenes []SceneConfig, signals chan core.Signal, logger *zap.Logger) BaseDevice {
+func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int , scenes []SceneConfig, signals chan core.Signal, logger *zap.Logger) BaseDevice {
 	device := BaseDevice{
-		Alias:        alias,
-		Universe:     [512]byte{},
-		Scenes:       make(map[string]Scene),
-		CurrentScene: nil,
-		Signals:      signals,
-		Logger:       logger,
+		Alias:               alias,
+		Universe:            [512]byte{},
+		NonBlackoutChannels: make(map[int]struct{}),
+		Scenes:              make(map[string]Scene),
+		CurrentScene:        nil,
+		Signals:             signals,
+		Logger:              logger,
 	}
 
+	device.NonBlackoutChannels = ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels)
 	device.Scenes = ReadScenesFromDeviceConfig(scenes)
 	device.GetUniverseFromCache(ctx)
 	device.GetScenesFromCache(ctx)
@@ -111,7 +114,7 @@ func (b *BaseDevice) IncrementChannel(ctx context.Context, command *models.Incre
 
 	command.Channel = channel.UniverseChannelID
 	command.Value = int(b.Universe[command.Channel]) + command.Value
-	if (int(b.Universe[command.Channel]) + command.Value) < 0 || (int(b.Universe[command.Channel]) + command.Value) > 255 {
+	if (int(b.Universe[command.Channel])+command.Value) < 0 || (int(b.Universe[command.Channel])+command.Value) > 255 {
 		return fmt.Errorf("incremented channel value '%d' out of range [0, 255]", command.Value)
 	}
 
@@ -129,7 +132,12 @@ func (b *BaseDevice) WriteUniverseToDevice() error {
 }
 
 func (b *BaseDevice) Blackout(ctx context.Context) error {
-	b.Universe = [512]byte{}
+	for i := 0; i < 512; i++ {
+		_, ok := b.NonBlackoutChannels[i]
+		if !ok {
+			b.Universe[i] = 0
+		}
+	}
 	b.SaveUniverseToCache(ctx)
 	return nil
 }

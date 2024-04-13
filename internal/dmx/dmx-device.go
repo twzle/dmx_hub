@@ -19,7 +19,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMX
 	}
 
 	newDMX := &dmxDevice{
-		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.Scenes, signals, logger),
+		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, signals, logger),
 		dev:        dev}
 
 	newDMX.WriteUniverseToDevice()
@@ -114,10 +114,9 @@ func (d *dmxDevice) WriteValueToChannel(command models.SetChannel) error {
 
 func (d *dmxDevice) Blackout(ctx context.Context) error {
 	d.BaseDevice.Blackout(ctx)
-	d.dev.ClearAll()
-	err := d.dev.Render()
+	err := d.WriteUniverseToDevice()
 	if err != nil {
-		return fmt.Errorf("sending frame to device error: %v", err)
+		return err
 	}
 	return nil
 }

@@ -17,15 +17,17 @@ type SceneConfig struct {
 }
 
 type ArtNetConfig struct {
-	Alias  string        `json:"alias" yaml:"alias"`
-	IP     net.IP        `json:"ip" yaml:"ip"`
-	Scenes []SceneConfig `json:"scenes" yaml:"scenes"`
+	Alias               string        `json:"alias" yaml:"alias"`
+	IP                  net.IP        `json:"ip" yaml:"ip"`
+	Scenes              []SceneConfig `json:"scenes" yaml:"scenes"`
+	NonBlackoutChannels []int         `json:"non_blackout_channels" yaml:"non_blackout_channels"`
 }
 
 type DMXConfig struct {
-	Alias  string        `json:"alias" yaml:"alias"`
-	Path   string        `json:"path" yaml:"path"`
-	Scenes []SceneConfig `json:"scenes" yaml:"scenes"`
+	Alias               string        `json:"alias" yaml:"alias"`
+	Path                string        `json:"path" yaml:"path"`
+	Scenes              []SceneConfig `json:"scenes" yaml:"scenes"`
+	NonBlackoutChannels []int         `json:"non_blackout_channels" yaml:"non_blackout_channels"`
 }
 
 type UserConfig struct {
@@ -111,4 +113,14 @@ func ReadScenesFromDeviceConfig(sceneListConfig []SceneConfig) map[string]Scene 
 	}
 
 	return scenes
+}
+
+func ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels []int) (map[int]struct{}) {
+	nonBlackoutChannelsMap := make(map[int]struct{})
+
+	for _, universeChannelID := range nonBlackoutChannels {
+		nonBlackoutChannelsMap[universeChannelID] = struct{}{}
+	}
+
+	return nonBlackoutChannelsMap
 }

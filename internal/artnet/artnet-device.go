@@ -18,7 +18,7 @@ func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.
 	dev.Start()
 
 	newArtNet := &artnetDevice{
-		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.Scenes, signals, logger),
+		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, signals, logger),
 		dev:        dev}
 		
 	newArtNet.WriteUniverseToDevice()
@@ -77,7 +77,7 @@ func (d *artnetDevice) IncrementChannel(ctx context.Context, command models.Incr
 }
 
 func (d *artnetDevice) WriteUniverseToDevice() error {
-	d.dev.SendDMXToAddress(d.BaseDevice.Universe, artnet.Address{Net: 0, SubUni: 0})
+	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: 0, SubUni: 0})
 	return nil
 }
 
@@ -90,8 +90,11 @@ func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
 	return nil
 }
 
-func (d *artnetDevice) Blackout(ctx context.Context) error{
+func (d *artnetDevice) Blackout(ctx context.Context) error {
 	d.BaseDevice.Blackout(ctx)
-	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: 0, SubUni: 0})
+	err := d.WriteUniverseToDevice()
+	if err != nil {
+		return err
+	}
 	return nil
 }

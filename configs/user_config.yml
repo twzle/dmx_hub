@@ -1,6 +1,9 @@
 dmx_devices:
   - alias: DMX1
-    path: "COM1" 
+    path: "COM1"
+    non_blackout_channels:
+      -  20
+      -  25 
     scenes:
     - scene_alias: "scene 1"
       channel_map:
@@ -29,6 +32,9 @@ dmx_devices:
 artnet_devices:
   - alias: Artnet1
     ip: "172.18.191.119"
+    non_blackout_channels:
+      -  20
+      -  25 
     scenes:
     - scene_alias: "scene 1"
       channel_map:
