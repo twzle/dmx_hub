@@ -1,6 +1,7 @@
 dmx_devices:
   - alias: DMX1
-    path: "COM1"
+    path: "COM10"
+    reconnect_interval: 1500
     non_blackout_channels:
       -  20
       -  25 
@@ -31,7 +32,9 @@ dmx_devices:
          universe_channel_id: 25 
 artnet_devices:
   - alias: Artnet1
-    ip: "172.18.191.119"
+    net: 0
+    subuni: 0
+    reconnect_interval: 1500
     non_blackout_channels:
       -  20
       -  25 

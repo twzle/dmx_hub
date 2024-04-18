@@ -3,6 +3,9 @@ package device
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 	"git.miem.hse.ru/hubman/hubman-lib/core"
@@ -17,9 +20,13 @@ type BaseDevice struct {
 	CurrentScene        *Scene
 	Signals             chan core.Signal
 	Logger              *zap.Logger
+	Connected           atomic.Bool
+	ReconnectInterval   time.Duration
+	StopReconnect       chan struct{}
+	Mutex               sync.Mutex
 }
 
-func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int , scenes []SceneConfig, signals chan core.Signal, logger *zap.Logger) BaseDevice {
+func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int, scenes []SceneConfig, reconnectInteval int, signals chan core.Signal, logger *zap.Logger) *BaseDevice {
 	device := BaseDevice{
 		Alias:               alias,
 		Universe:            [512]byte{},
@@ -27,27 +34,31 @@ func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int 
 		Scenes:              make(map[string]Scene),
 		CurrentScene:        nil,
 		Signals:             signals,
-		Logger:              logger,
+		Logger:              logger.With(zap.String("device", alias)),
+		Connected:           atomic.Bool{},
+		ReconnectInterval:   time.Duration(time.Millisecond * time.Duration(reconnectInteval)),
+		StopReconnect:       make(chan struct{}),
+		Mutex:               sync.Mutex{},
 	}
 
 	device.NonBlackoutChannels = ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels)
 	device.Scenes = ReadScenesFromDeviceConfig(scenes)
 	device.GetUniverseFromCache(ctx)
 	device.GetScenesFromCache(ctx)
-	return device
+	return &device
 }
 
 func (b *BaseDevice) GetUniverseFromCache(ctx context.Context) {
 	err := b.ReadUnvierse(ctx)
 	if err != nil {
-		b.Logger.Warn("get universe from cache failed", zap.Error(err), zap.Any("device", b.Alias))
+		b.Logger.Warn("get universe from cache failed", zap.Error(err))
 	}
 }
 
 func (b *BaseDevice) SaveUniverseToCache(ctx context.Context) {
 	err := b.WriteUniverse(ctx)
 	if err != nil {
-		b.Logger.Warn("save universe to cache failed", zap.Error(err), zap.Any("device", b.Alias))
+		b.Logger.Warn("save universe to cache failed", zap.Error(err))
 	}
 }
 
@@ -64,6 +75,10 @@ func (b *BaseDevice) GetAlias() string {
 }
 
 func (b *BaseDevice) SetScene(ctx context.Context, command models.SetScene) error {
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+
 	scene, ok := b.Scenes[command.SceneAlias]
 	if !ok {
 		return fmt.Errorf("invalid scene alias '%s'", command.SceneAlias)
@@ -88,6 +103,10 @@ func (b *BaseDevice) SaveScene(ctx context.Context) error {
 }
 
 func (b *BaseDevice) SetChannel(ctx context.Context, command *models.SetChannel) error {
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+
 	if b.CurrentScene == nil {
 		return fmt.Errorf("no scene is selected")
 	}
@@ -103,6 +122,10 @@ func (b *BaseDevice) SetChannel(ctx context.Context, command *models.SetChannel)
 }
 
 func (b *BaseDevice) IncrementChannel(ctx context.Context, command *models.IncrementChannel) error {
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+
 	if b.CurrentScene == nil {
 		return fmt.Errorf("no scene is selected")
 	}
@@ -124,14 +147,24 @@ func (b *BaseDevice) IncrementChannel(ctx context.Context, command *models.Incre
 }
 
 func (b *BaseDevice) WriteValueToChannel(command models.SetChannel) error {
-	panic("")
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+	return nil
 }
 
 func (b *BaseDevice) WriteUniverseToDevice() error {
-	panic("")
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+	return nil
 }
 
 func (b *BaseDevice) Blackout(ctx context.Context) error {
+	if !b.Connected.Load() {
+		return fmt.Errorf("no connection to device")
+	}
+
 	for i := 0; i < 512; i++ {
 		_, ok := b.NonBlackoutChannels[i]
 		if !ok {
@@ -154,4 +187,9 @@ func (b *BaseDevice) CreateSceneSavedSignal() {
 		DeviceAlias: b.Alias,
 		SceneAlias:  b.CurrentScene.Alias}
 	b.Signals <- signal
+}
+
+func (b *BaseDevice) Close() {
+	b.StopReconnect <- struct{}{}
+	close(b.StopReconnect)
 }

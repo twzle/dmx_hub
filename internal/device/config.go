@@ -3,7 +3,6 @@ package device
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 )
 
 type ChannelMapConfig struct {
@@ -18,9 +17,11 @@ type SceneConfig struct {
 
 type ArtNetConfig struct {
 	Alias               string        `json:"alias" yaml:"alias"`
-	IP                  net.IP        `json:"ip" yaml:"ip"`
+	Net                 int           `json:"net" yaml:"net"`
+	SubUni              int           `json:"subuni" yaml:"subuni"`
 	Scenes              []SceneConfig `json:"scenes" yaml:"scenes"`
 	NonBlackoutChannels []int         `json:"non_blackout_channels" yaml:"non_blackout_channels"`
+	ReconnectInterval   int           `json:"reconnect_interval" yaml:"reconnect_interval"`
 }
 
 type DMXConfig struct {
@@ -28,6 +29,7 @@ type DMXConfig struct {
 	Path                string        `json:"path" yaml:"path"`
 	Scenes              []SceneConfig `json:"scenes" yaml:"scenes"`
 	NonBlackoutChannels []int         `json:"non_blackout_channels" yaml:"non_blackout_channels"`
+	ReconnectInterval   int           `json:"reconnect_interval" yaml:"reconnect_interval"`
 }
 
 type UserConfig struct {
@@ -55,10 +57,15 @@ func (conf *UserConfig) Validate() error {
 				"valid ArtNet device_name must be provided in config",
 				idx, device.Alias)
 		}
-		if device.IP == nil {
-			return fmt.Errorf("device #{%d} ({%s}): "+
-				"valid ArtNet IP address must be provided in config",
-				idx, device.IP)
+		if device.Net < 0 || device.Net > 127 {
+			return fmt.Errorf("device #{%d} ({%d}): "+
+				"valid ArtNet Net address ([0:127]) must be provided in config",
+				idx, device.Net)
+		}
+		if device.SubUni < 0 || device.SubUni > 255 {
+			return fmt.Errorf("device #{%d} ({%d}): "+
+				"valid ArtNet SubUni address ([0:255]) must be provided in config",
+				idx, device.SubUni)
 		}
 	}
 	return nil
@@ -115,7 +122,7 @@ func ReadScenesFromDeviceConfig(sceneListConfig []SceneConfig) map[string]Scene 
 	return scenes
 }
 
-func ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels []int) (map[int]struct{}) {
+func ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels []int) map[int]struct{} {
 	nonBlackoutChannelsMap := make(map[int]struct{})
 
 	for _, universeChannelID := range nonBlackoutChannels {

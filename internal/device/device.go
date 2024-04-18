@@ -26,4 +26,5 @@ type Device interface {
 	WriteValueToChannel(command models.SetChannel) error
 	WriteUniverseToDevice() error
 	Blackout(ctx context.Context) error
+	Close()
 }

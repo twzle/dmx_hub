@@ -58,7 +58,7 @@ func (b *BaseDevice) ReadScenes(ctx context.Context){
 	
 	encodedScenesMap := make(map[string]string)
 
-	for sceneAlias, _ := range b.Scenes {
+	for sceneAlias := range b.Scenes {
 		key := fmt.Sprintf("%s_scene_%s", b.Alias, sceneAlias)
 		encodedScene, err := rdb.Get(ctx, key).Result()
 		if err != nil {

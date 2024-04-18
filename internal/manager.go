@@ -154,6 +154,8 @@ func (m *manager) addArtNet(ctx context.Context, conf device.ArtNetConfig) error
 }
 
 func (m *manager) removeDevice(_ context.Context, alias string) error {
+	dev := m.devices[alias]
+	dev.Close()
 	delete(m.devices, alias)
 	return nil
 }

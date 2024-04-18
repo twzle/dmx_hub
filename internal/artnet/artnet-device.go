@@ -3,6 +3,7 @@ package artnet
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
@@ -12,22 +13,64 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.ArtNetConfig, logger *zap.Logger) (device.Device, error) {
-	log := artnet.NewDefaultLogger()
-	dev := artnet.NewController(conf.Alias, conf.IP, log)
-	dev.Start()
 
+func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.ArtNetConfig, logger *zap.Logger) (device.Device, error) {
 	newArtNet := &artnetDevice{
-		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, signals, logger),
-		dev:        dev}
-		
-	newArtNet.WriteUniverseToDevice()
+		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger),
+		net:        uint8(conf.Net),
+		subUni:     uint8(conf.SubUni),
+		dev:        GetArtNetController()}
+
+	go newArtNet.reconnect()
 	return newArtNet, nil
 }
 
 type artnetDevice struct {
 	device.BaseDevice
-	dev *artnet.Controller
+	net    uint8
+	subUni uint8
+	dev    *artnet.Controller
+}
+
+func (d *artnetDevice) reconnect() {
+	ticker := time.NewTicker(d.ReconnectInterval)
+	for {
+		select {
+		case <-d.StopReconnect:
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			if !d.Connected.Load() {
+				d.connect()
+			} else {
+				d.checkHealth()
+			}
+		}
+	}
+}
+
+
+func (d *artnetDevice) checkHealth() {
+	_, ok := d.dev.OutputAddress[artnet.Address{Net: d.net, SubUni: d.subUni}]
+	if ok {
+		return
+	}
+
+	d.Connected.CompareAndSwap(true, false)
+}
+
+
+func (d *artnetDevice) connect() {
+	_, ok := d.dev.OutputAddress[artnet.Address{Net: d.net, SubUni: d.subUni}]
+	if !ok {
+		d.Logger.Warn("Unable to connect ArtNet device", zap.Any("net", d.net), zap.Any("subuni", d.subUni))
+		return
+	}
+
+	d.Logger.Info("Connected ArtNet device",  zap.Any("net", d.net), zap.Any("subuni", d.subUni))
+	d.Connected.CompareAndSwap(false, true)
+
+	d.WriteUniverseToDevice()
 }
 
 func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) error {
@@ -51,6 +94,7 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 	if err != nil {
 		return err
 	}
+
 	err = d.WriteValueToChannel(command)
 	if err != nil {
 		return err
@@ -77,22 +121,36 @@ func (d *artnetDevice) IncrementChannel(ctx context.Context, command models.Incr
 }
 
 func (d *artnetDevice) WriteUniverseToDevice() error {
-	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: 0, SubUni: 0})
+	err := d.BaseDevice.WriteUniverseToDevice()
+	if err != nil {
+		return err
+	}
+
+	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: d.net, SubUni: d.subUni})
 	return nil
 }
 
 func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
+	err := d.BaseDevice.WriteValueToChannel(command)
+	if err != nil {
+		return err
+	}
+
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: 0, SubUni: 0})
+	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: d.net, SubUni: d.subUni})
 
 	return nil
 }
 
 func (d *artnetDevice) Blackout(ctx context.Context) error {
-	d.BaseDevice.Blackout(ctx)
-	err := d.WriteUniverseToDevice()
+	err := d.BaseDevice.Blackout(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = d.WriteUniverseToDevice()
 	if err != nil {
 		return err
 	}
