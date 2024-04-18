@@ -3,6 +3,7 @@ package dmx
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"git.miem.hse.ru/hubman/hubman-lib/core"
 	"go.uber.org/zap"
@@ -13,25 +14,62 @@ import (
 )
 
 func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMXConfig, logger *zap.Logger) (device.Device, error) {
-	dev, err := DMX.NewDMXConnection(conf.Path)
-	if err != nil {
-		return nil, fmt.Errorf("error with creating new dmx dmxDevice: %v", err)
+	newDMX := &dmxDevice{
+		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger),
+		path:       conf.Path,
+		dev:        nil,
 	}
 
-	newDMX := &dmxDevice{
-		BaseDevice: device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, signals, logger),
-		dev:        dev}
-
-	newDMX.WriteUniverseToDevice()
+	go newDMX.reconnect()
 	return newDMX, nil
 }
 
 type dmxDevice struct {
 	device.BaseDevice
-	dev     *DMX.DMX
+	path string
+	dev  *DMX.DMX
+}
+
+func (d *dmxDevice) reconnect() {
+	ticker := time.NewTicker(d.ReconnectInterval)
+	for {
+		select {
+		case <-d.StopReconnect:
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			if !d.Connected.Load() {
+				d.connect()
+			}
+		}
+	}
+}
+
+func (d *dmxDevice) connect() {
+	dev, err := DMX.NewDMXConnection(d.path)
+	if err != nil {
+		d.Logger.Warn("Unable to connect DMX device", zap.Any("path", d.path), zap.Error(err))
+		return
+	}
+	d.Connected.CompareAndSwap(false, true)
+	d.Logger.Info("Connected DMX device")
+
+	d.Mutex.Lock()
+	d.dev = dev
+	d.Mutex.Unlock()
+
+	d.WriteUniverseToDevice()
 }
 
 func (d *dmxDevice) WriteUniverseToDevice() error {
+	err := d.BaseDevice.WriteUniverseToDevice()
+	if err != nil {
+		return err
+	}
+
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
+
 	for i := 0; i < 510; i++ {
 		err := d.dev.SetChannel(i+1, d.Universe[i])
 		if err != nil {
@@ -39,8 +77,10 @@ func (d *dmxDevice) WriteUniverseToDevice() error {
 		}
 	}
 
-	err := d.dev.Render()
+	err = d.dev.Render()
 	if err != nil {
+		d.dev.Close()
+		d.Connected.CompareAndSwap(true, false)
 		return fmt.Errorf("sending frame to device error: %v", err)
 	}
 	return nil
@@ -98,25 +138,48 @@ func (d *dmxDevice) IncrementChannel(ctx context.Context, command models.Increme
 }
 
 func (d *dmxDevice) WriteValueToChannel(command models.SetChannel) error {
+	err := d.BaseDevice.WriteValueToChannel(command)
+	if err != nil {
+		return err
+	}
+
 	if command.Channel < 1 || command.Channel >= 512 {
 		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
 	}
-	err := d.dev.SetChannel(command.Channel, byte(command.Value))
+	err = d.dev.SetChannel(command.Channel, byte(command.Value))
 	if err != nil {
 		return fmt.Errorf("setting value to channel error: %v", err)
 	}
+
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
+
 	err = d.dev.Render()
 	if err != nil {
+		d.dev.Close()
+		d.Connected.CompareAndSwap(true, false)
 		return fmt.Errorf("sending frame to device error: %v", err)
 	}
 	return nil
 }
 
 func (d *dmxDevice) Blackout(ctx context.Context) error {
-	d.BaseDevice.Blackout(ctx)
-	err := d.WriteUniverseToDevice()
+	err := d.BaseDevice.Blackout(ctx)
 	if err != nil {
 		return err
 	}
+
+	err = d.WriteUniverseToDevice()
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (d *dmxDevice) Close(){
+	d.BaseDevice.Close()
+	if d.Connected.Load() {
+		d.dev.Close()
+	}
 }
