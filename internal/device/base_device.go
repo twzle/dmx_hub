@@ -12,6 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	DeviceDisconnectedCheckLabelFormat = "DEVICE_DISCONNECTED_%s"
+)
+
 type BaseDevice struct {
 	Alias               string
 	Universe            [512]byte
@@ -24,9 +28,10 @@ type BaseDevice struct {
 	ReconnectInterval   time.Duration
 	StopReconnect       chan struct{}
 	Mutex               sync.Mutex
+	CheckManager        core.CheckRegistry
 }
 
-func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int, scenes []SceneConfig, reconnectInteval int, signals chan core.Signal, logger *zap.Logger) *BaseDevice {
+func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int, scenes []SceneConfig, reconnectInteval int, signals chan core.Signal, logger *zap.Logger, checkManager core.CheckRegistry) *BaseDevice {
 	device := BaseDevice{
 		Alias:               alias,
 		Universe:            [512]byte{},
@@ -39,6 +44,7 @@ func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int,
 		ReconnectInterval:   time.Duration(time.Millisecond * time.Duration(reconnectInteval)),
 		StopReconnect:       make(chan struct{}),
 		Mutex:               sync.Mutex{},
+		CheckManager:        checkManager,
 	}
 
 	device.NonBlackoutChannels = ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels)

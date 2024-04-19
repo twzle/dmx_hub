@@ -13,9 +13,9 @@ import (
 	DMX "github.com/akualab/dmx"
 )
 
-func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMXConfig, logger *zap.Logger) (device.Device, error) {
+func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMXConfig, logger *zap.Logger, checkManager core.CheckRegistry) (device.Device, error) {
 	newDMX := &dmxDevice{
-		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger),
+		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger, checkManager),
 		path:       conf.Path,
 		dev:        nil,
 	}
@@ -48,17 +48,28 @@ func (d *dmxDevice) reconnect() {
 func (d *dmxDevice) connect() {
 	dev, err := DMX.NewDMXConnection(d.path)
 	if err != nil {
+		connCheck := core.NewCheck(
+			fmt.Sprintf(device.DeviceDisconnectedCheckLabelFormat, d.Alias),
+			"",
+		)
+		d.CheckManager.RegisterFail(connCheck)
 		d.Logger.Warn("Unable to connect DMX device", zap.Any("path", d.path), zap.Error(err))
 		return
 	}
+
 	d.Connected.CompareAndSwap(false, true)
-	d.Logger.Info("Connected DMX device")
 
 	d.Mutex.Lock()
 	d.dev = dev
 	d.Mutex.Unlock()
-
 	d.WriteUniverseToDevice()
+
+	connCheck := core.NewCheck(
+		fmt.Sprintf(device.DeviceDisconnectedCheckLabelFormat, d.Alias),
+		"",
+	)
+	d.CheckManager.RegisterSuccess(connCheck)
+	d.Logger.Info("Connected DMX device", zap.Any("path", d.path))
 }
 
 func (d *dmxDevice) WriteUniverseToDevice() error {

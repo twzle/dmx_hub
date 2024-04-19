@@ -13,18 +13,20 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewManager(logger *zap.Logger) *manager {
+func NewManager(logger *zap.Logger, checkManager core.CheckRegistry) *manager {
 	return &manager{
 		devices: make(map[string]device.Device),
 		signals: make(chan core.Signal),
 		logger:  logger,
+		checkManager: checkManager,
 	}
 }
 
 type manager struct {
-	devices map[string]device.Device
-	signals chan core.Signal
-	logger  *zap.Logger
+	devices      map[string]device.Device
+	signals      chan core.Signal
+	logger       *zap.Logger
+	checkManager core.CheckRegistry
 }
 
 func (m *manager) GetSignals() chan core.Signal {
@@ -38,6 +40,8 @@ func (m *manager) GetDevices() map[string]device.Device {
 func (m *manager) UpdateDevices(ctx context.Context, userConfig device.UserConfig) {
 	dmxDeviceConfig := userConfig.DMXDevices
 	artnetDeviceConfig := userConfig.ArtNetDevices
+
+	m.checkManager.Clear()
 
 	for alias := range m.devices {
 		err := m.removeDevice(ctx, alias)
@@ -136,7 +140,7 @@ func (m *manager) checkDevice(deviceAlias string) (device.Device, error) {
 }
 
 func (m *manager) addDMX(ctx context.Context, conf device.DMXConfig) error {
-	newDMX, err := dmx.NewDMXDevice(ctx, m.signals, conf, m.logger)
+	newDMX, err := dmx.NewDMXDevice(ctx, m.signals, conf, m.logger, m.checkManager)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}
@@ -145,7 +149,7 @@ func (m *manager) addDMX(ctx context.Context, conf device.DMXConfig) error {
 }
 
 func (m *manager) addArtNet(ctx context.Context, conf device.ArtNetConfig) error {
-	newArtNet, err := artnet.NewArtNetDevice(ctx, m.signals, conf, m.logger)
+	newArtNet, err := artnet.NewArtNetDevice(ctx, m.signals, conf, m.logger, m.checkManager)
 	if err != nil {
 		return fmt.Errorf("error with add device: %v", err)
 	}
