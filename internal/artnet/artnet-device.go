@@ -14,9 +14,9 @@ import (
 )
 
 
-func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.ArtNetConfig, logger *zap.Logger) (device.Device, error) {
+func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.ArtNetConfig, logger *zap.Logger, checkManager core.CheckRegistry) (device.Device, error) {
 	newArtNet := &artnetDevice{
-		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger),
+		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger, checkManager),
 		net:        uint8(conf.Net),
 		subUni:     uint8(conf.SubUni),
 		dev:        GetArtNetController()}
@@ -63,14 +63,24 @@ func (d *artnetDevice) checkHealth() {
 func (d *artnetDevice) connect() {
 	_, ok := d.dev.OutputAddress[artnet.Address{Net: d.net, SubUni: d.subUni}]
 	if !ok {
+		connCheck := core.NewCheck(
+			fmt.Sprintf(device.DeviceDisconnectedCheckLabelFormat, d.Alias),
+			"",
+		)
+		d.CheckManager.RegisterFail(connCheck)
 		d.Logger.Warn("Unable to connect ArtNet device", zap.Any("net", d.net), zap.Any("subuni", d.subUni))
 		return
 	}
 
-	d.Logger.Info("Connected ArtNet device",  zap.Any("net", d.net), zap.Any("subuni", d.subUni))
 	d.Connected.CompareAndSwap(false, true)
-
 	d.WriteUniverseToDevice()
+	
+	connCheck := core.NewCheck(
+		fmt.Sprintf(device.DeviceDisconnectedCheckLabelFormat, d.Alias),
+		"",
+	)
+	d.CheckManager.RegisterSuccess(connCheck)
+	d.Logger.Info("Connected ArtNet device",  zap.Any("net", d.net), zap.Any("subuni", d.subUni))
 }
 
 func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) error {

@@ -33,9 +33,10 @@ func main() {
 	}
 
 	app := core.NewContainer(agentConf.System.Logging)
+	checkManager := core.NewCheckManager()
 	logger := app.Logger()
 
-	manager := internal.NewManager(logger)
+	manager := internal.NewManager(logger, checkManager)
 	signals := manager.GetSignals()
 
 	app.RegisterPlugin(
