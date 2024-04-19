@@ -31,7 +31,11 @@ type BaseDevice struct {
 	CheckManager        core.CheckRegistry
 }
 
-func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int, scenes []SceneConfig, reconnectInteval int, signals chan core.Signal, logger *zap.Logger, checkManager core.CheckRegistry) *BaseDevice {
+func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int, scenes []SceneConfig, reconnectInterval int, signals chan core.Signal, logger *zap.Logger, checkManager core.CheckRegistry) *BaseDevice {
+	if reconnectInterval < DefaultReconnectInterval {
+		reconnectInterval = DefaultReconnectInterval
+	}
+	
 	device := BaseDevice{
 		Alias:               alias,
 		Universe:            [512]byte{},
@@ -41,7 +45,7 @@ func NewBaseDevice(ctx context.Context, alias string, nonBlackoutChannels []int,
 		Signals:             signals,
 		Logger:              logger.With(zap.String("device", alias)),
 		Connected:           atomic.Bool{},
-		ReconnectInterval:   time.Duration(time.Millisecond * time.Duration(reconnectInteval)),
+		ReconnectInterval:   time.Duration(time.Millisecond * time.Duration(reconnectInterval)),
 		StopReconnect:       make(chan struct{}),
 		Mutex:               sync.Mutex{},
 		CheckManager:        checkManager,

@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+const (
+	DefaultReconnectInterval = 1500
+)
+
 type ChannelMapConfig struct {
 	SceneChannelID    uint16 `json:"scene_channel_id" yaml:"scene_channel_id"`
 	UniverseChannelID uint16 `json:"universe_channel_id" yaml:"universe_channel_id"`
@@ -50,6 +54,10 @@ func (conf *UserConfig) Validate() error {
 				"valid DMX device_name must be provided in config",
 				idx, device.Alias)
 		}
+		if device.ReconnectInterval < DefaultReconnectInterval {
+			device.ReconnectInterval = DefaultReconnectInterval
+			conf.DMXDevices[idx] = device
+		}
 	}
 	for idx, device := range conf.ArtNetDevices {
 		if device.Alias == "" {
@@ -66,6 +74,10 @@ func (conf *UserConfig) Validate() error {
 			return fmt.Errorf("device #{%d} ({%d}): "+
 				"valid ArtNet SubUni address ([0:255]) must be provided in config",
 				idx, device.SubUni)
+		}
+		if device.ReconnectInterval < DefaultReconnectInterval {
+			device.ReconnectInterval = DefaultReconnectInterval
+			conf.ArtNetDevices[idx] = device
 		}
 	}
 	return nil
