@@ -108,6 +108,7 @@ func main() {
 				}
 				manager.UpdateDevices(ctx, *update)
 			}),
+			hubman.WithCheckRegistry(checkManager),
 		),
 	)
 
