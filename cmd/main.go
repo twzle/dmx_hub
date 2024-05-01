@@ -9,8 +9,6 @@ import (
 	"git.miem.hse.ru/hubman/dmx-executor/internal"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
-	"go.uber.org/zap"
-
 	"git.miem.hse.ru/hubman/hubman-lib"
 	"git.miem.hse.ru/hubman/hubman-lib/core"
 	"git.miem.hse.ru/hubman/hubman-lib/executor"
@@ -49,50 +47,35 @@ func main() {
 				hubman.WithChannel(signals),
 			),
 			hubman.WithExecutor(
-				hubman.WithCommand(models.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+				hubman.WithCommand(models.SetChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) error {
 					var cmd models.SetChannel // json-like api
 					parser(&cmd)              // enriches your command with data from redis
 
-					err := manager.ProcessSetChannel(ctx, cmd)
-					if err != nil {
-						logger.Error("error while execute 'SetChannel' command", zap.Error(err), zap.Any("device", cmd.DeviceAlias))
-					}
+					return manager.ProcessSetChannel(ctx, cmd)
 				}),
-				hubman.WithCommand(models.IncrementChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+				hubman.WithCommand(models.IncrementChannel{}, func(command core.SerializedCommand, parser executor.CommandParser) error {
 					var cmd models.IncrementChannel // json-like api
 					parser(&cmd)                    // enriches your command with data from redis
 
-					err := manager.ProcessIncrementChannel(ctx, cmd)
-					if err != nil {
-						logger.Error("error while execute 'IncrementChannel' command", zap.Error(err), zap.Any("device", cmd.DeviceAlias))
-					}
+					return manager.ProcessIncrementChannel(ctx, cmd)
 				}),
-				hubman.WithCommand(models.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+				hubman.WithCommand(models.Blackout{}, func(command core.SerializedCommand, parser executor.CommandParser) error {
 					var cmd models.Blackout // json-like api
 					parser(&cmd)            // enriches your command with data from redis
 
-					err := manager.ProcessBlackout(ctx, cmd)
-					if err != nil {
-						logger.Error("error while execute 'Blackout' command", zap.Error(err), zap.Any("device", cmd.DeviceAlias))
-					}
+					return manager.ProcessBlackout(ctx, cmd)
 				}),
-				hubman.WithCommand(models.SetScene{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+				hubman.WithCommand(models.SetScene{}, func(command core.SerializedCommand, parser executor.CommandParser) error {
 					var cmd models.SetScene // json-like api
 					parser(&cmd)            // enriches your command with data from redis
 
-					err := manager.ProcessSetScene(ctx, cmd)
-					if err != nil {
-						logger.Error("error while execute 'SetScene' command", zap.Error(err), zap.Any("device", cmd.DeviceAlias))
-					}
+					return manager.ProcessSetScene(ctx, cmd)
 				}),
-				hubman.WithCommand(models.SaveScene{}, func(command core.SerializedCommand, parser executor.CommandParser) {
+				hubman.WithCommand(models.SaveScene{}, func(command core.SerializedCommand, parser executor.CommandParser) error {
 					var cmd models.SaveScene // json-like api
 					parser(&cmd)             // enriches your command with data from redis
 
-					err := manager.ProcessSaveScene(ctx, cmd)
-					if err != nil {
-						logger.Error("error while execute 'SaveScene' command", zap.Error(err), zap.Any("device", cmd.DeviceAlias))
-					}
+					return manager.ProcessSaveScene(ctx, cmd)
 				}),
 			),
 			hubman.WithOnConfigRefresh(func(configuration core.AgentConfiguration) {
