@@ -40,6 +40,8 @@ func (d *dmxDevice) reconnect() {
 		case <-ticker.C:
 			if !d.Connected.Load() {
 				d.connect()
+			} else {
+				d.checkHealth()
 			}
 		}
 	}
@@ -70,6 +72,17 @@ func (d *dmxDevice) connect() {
 	)
 	d.CheckManager.RegisterSuccess(connCheck)
 	d.Logger.Info("Connected DMX device", zap.Any("path", d.path))
+}
+
+func (d *dmxDevice) checkHealth() {
+	d.Mutex.Lock()
+	defer d.Mutex.Unlock()
+
+	err := d.dev.Render()
+	if err != nil {
+		d.dev.Close()
+		d.Connected.Store(false)
+	}
 }
 
 func (d *dmxDevice) WriteUniverseToDevice() error {
