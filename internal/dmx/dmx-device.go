@@ -81,8 +81,8 @@ func (d *dmxDevice) WriteUniverseToDevice() error {
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
 
-	for i := 0; i < 510; i++ {
-		err := d.dev.SetChannel(i+1, d.Universe[i])
+	for i := 1; i < 511; i++ {
+		err := d.dev.SetChannel(i, d.Universe[i])
 		if err != nil {
 			return fmt.Errorf("setting value to channel error: %v", err)
 		}
