@@ -129,8 +129,8 @@ func (b *BaseDevice) DecodeUniverse(sequence string) error {
 			return fmt.Errorf("got invalid RLE sequence (lastChannel out of range [0:511])")
 		}
 
-		if channelValue < 0 || channelValue > 511 {
-			return fmt.Errorf("got invalid RLE sequence (channelValue out of range [0:511])")
+		if channelValue < 0 || channelValue > 255 {
+			return fmt.Errorf("got invalid RLE sequence (channelValue out of range [0:255])")
 		}
 
 		if previousLastChannel >= initialChannel {
@@ -205,8 +205,8 @@ func (b *BaseDevice) DecodeScene(sequence string, scene Scene) error {
 			return fmt.Errorf("universe channel out of range [0:511]")
 		}
 
-		if channelValue < 0 || channelValue > 511 {
-			return fmt.Errorf("channel value out of range [0:511]")
+		if channelValue < 0 || channelValue > 255 {
+			return fmt.Errorf("channel value out of range [0:255]")
 		}
 
 		scene.ChannelMap[sceneChannelID] = Channel{UniverseChannelID: UniverseChannelID, Value: channelValue}
