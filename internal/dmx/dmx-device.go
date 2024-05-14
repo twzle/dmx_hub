@@ -10,7 +10,6 @@ import (
 
 	"git.miem.hse.ru/hubman/dmx-executor/internal/device"
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
-	DMX "github.com/akualab/dmx"
 )
 
 func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMXConfig, logger *zap.Logger, checkManager core.CheckRegistry) (device.Device, error) {
@@ -27,7 +26,7 @@ func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMX
 type dmxDevice struct {
 	device.BaseDevice
 	path string
-	dev  *DMX.DMX
+	dev  *DMX
 }
 
 func (d *dmxDevice) reconnect() {
@@ -48,7 +47,7 @@ func (d *dmxDevice) reconnect() {
 }
 
 func (d *dmxDevice) connect() {
-	dev, err := DMX.NewDMXConnection(d.path)
+	dev, err := NewDMXConnection(d.path)
 	if err != nil {
 		connCheck := core.NewCheck(
 			fmt.Sprintf(device.DeviceDisconnectedCheckLabelFormat, d.Alias),
@@ -94,7 +93,7 @@ func (d *dmxDevice) WriteUniverseToDevice() error {
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
 
-	for i := 1; i < 511; i++ {
+	for i := 0; i < 512; i++ {
 		err := d.dev.SetChannel(i, d.Universe[i])
 		if err != nil {
 			return fmt.Errorf("setting value to channel error: %v", err)
@@ -167,12 +166,9 @@ func (d *dmxDevice) WriteValueToChannel(command models.SetChannel) error {
 		return err
 	}
 
-	if command.Channel < 1 || command.Channel >= 512 {
-		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
-	}
 	err = d.dev.SetChannel(command.Channel, byte(command.Value))
 	if err != nil {
-		return fmt.Errorf("setting value to channel error: %v", err)
+		return err
 	}
 
 	d.Mutex.Lock()

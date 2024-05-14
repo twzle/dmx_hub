@@ -94,7 +94,7 @@ func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) er
 	}
 
 	d.SaveUniverseToCache(ctx)
-	d.WriteValueToChannel(models.SetChannel{})
+	d.WriteUniverseToDevice()
 	d.CreateSceneChangedSignal()
 	return nil
 }
@@ -146,8 +146,8 @@ func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
 		return err
 	}
 
-	if command.Channel < 1 || command.Channel >= 512 {
-		return fmt.Errorf("channel number should be beetwen 1 and 511, but got: %v", command.Channel)
+	if command.Channel < 0 || command.Channel >= 511 {
+		return fmt.Errorf("channel number should be beetwen 0 and 511, but got: %v", command.Channel)
 	}
 	d.dev.SendDMXToAddress(d.Universe, artnet.Address{Net: d.net, SubUni: d.subUni})
 
