@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
+
 func (b *BaseDevice) ReadUnvierse(ctx context.Context) error {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -49,13 +50,13 @@ func (b *BaseDevice) WriteUniverse(ctx context.Context) error {
 	return nil
 }
 
-func (b *BaseDevice) ReadScenes(ctx context.Context){
+func (b *BaseDevice) ReadScenes(ctx context.Context) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
 	})
-	
+
 	encodedScenesMap := make(map[string]string)
 
 	for sceneAlias := range b.Scenes {
@@ -69,12 +70,39 @@ func (b *BaseDevice) ReadScenes(ctx context.Context){
 	}
 
 	for sceneAlias, encodedScene := range encodedScenesMap {
-		err := b.DecodeScene(encodedScene, b.Scenes[sceneAlias])
+		decodedScene := Scene{Alias: sceneAlias, ChannelMap: make(map[int]Channel)}
+		err := b.DecodeScene(encodedScene, decodedScene)
 		if err != nil {
-			b.Scenes[sceneAlias] = Scene{}
 			b.Logger.Warn(fmt.Sprintf("decoding cached scene '%s' failed", sceneAlias), zap.Error(err), zap.Any("device", b.Alias))
+			continue
+		}
+
+		err = b.ValidateCachedScene(decodedScene, b.Scenes[sceneAlias])
+		if err != nil {
+			b.Logger.Warn(fmt.Sprintf("invalid cached scene '%s'", sceneAlias), zap.Error(err), zap.Any("device", b.Alias))
+		} else {
+			b.Scenes[sceneAlias] = decodedScene
 		}
 	}
+}
+
+func (b *BaseDevice) ValidateCachedScene(cachedScene Scene, configuredScene Scene) error {
+	if len(cachedScene.ChannelMap) != len(configuredScene.ChannelMap) {
+		return fmt.Errorf("unequal channelMap sizes")
+	}
+
+	for cachedKey, cachedChannel := range cachedScene.ChannelMap {
+		configuredChannel, ok := configuredScene.ChannelMap[cachedKey]
+		if !ok {
+			return fmt.Errorf("cached channelMap key '%d' was not found in configured scene", cachedKey)
+		}
+		if configuredChannel.UniverseChannelID != cachedChannel.UniverseChannelID {
+			return fmt.Errorf("cached UniverseChanneldID is not equal to configured UniverseChannelID ('%d' != '%d')",
+				cachedChannel.UniverseChannelID, configuredChannel.UniverseChannelID)
+		}
+	}
+	
+	return nil
 }
 
 func (b *BaseDevice) WriteScenes(ctx context.Context) {
@@ -103,8 +131,8 @@ func (b *BaseDevice) DecodeUniverse(sequence string) error {
 	}
 
 	previousLastChannel := -1
-	for i := 0; i < size; i+=9 {
-		subsequence := sequence[i:i+9]
+	for i := 0; i < size; i += 9 {
+		subsequence := sequence[i : i+9]
 		initialChannel, err := strconv.Atoi(subsequence[0:3])
 		if err != nil {
 			return err
@@ -139,7 +167,7 @@ func (b *BaseDevice) DecodeUniverse(sequence string) error {
 
 		for j := initialChannel; j <= lastChannel; j++ {
 			b.Universe[j] = byte(channelValue)
-		} 
+		}
 
 		previousLastChannel = lastChannel
 	}
@@ -152,8 +180,8 @@ func (b *BaseDevice) EncodeUniverse() string {
 	var currentChannelValue int = int(b.Universe[0])
 	var sequenceStart int = 0
 	for idx, channel := range b.Universe {
-		if currentChannelValue != int(channel){
-			result += fmt.Sprintf("%03d", sequenceStart) + fmt.Sprintf("%03d", idx - 1) + fmt.Sprintf("%03d", currentChannelValue)
+		if currentChannelValue != int(channel) {
+			result += fmt.Sprintf("%03d", sequenceStart) + fmt.Sprintf("%03d", idx-1) + fmt.Sprintf("%03d", currentChannelValue)
 			currentChannelValue = int(channel)
 			sequenceStart = idx
 		}
@@ -175,24 +203,24 @@ func (b *BaseDevice) EncodeScene(scene Scene) string {
 	return result
 }
 
-func (b *BaseDevice) DecodeScene(sequence string, scene Scene) error {
+func (b *BaseDevice) DecodeScene(sequence string, scene Scene) (error) {
 	size := len(sequence)
 	if size % 9 != 0 {
 		return fmt.Errorf("got invalid RLE sequence size")
 	}
 
-	for i := 0; i < size; i+=9 {
-		sceneChannelID, err := strconv.Atoi(sequence[i:i+3])
+	for i := 0; i < size; i += 9 {
+		sceneChannelID, err := strconv.Atoi(sequence[i : i+3])
 		if err != nil {
 			return err
 		}
 
-		UniverseChannelID, err := strconv.Atoi(sequence[i+3:i+6])
+		UniverseChannelID, err := strconv.Atoi(sequence[i+3 : i+6])
 		if err != nil {
 			return err
 		}
 
-		channelValue, err := strconv.Atoi(sequence[i+6:i+9])
+		channelValue, err := strconv.Atoi(sequence[i+6 : i+9])
 		if err != nil {
 			return err
 		}
