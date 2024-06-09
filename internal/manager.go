@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Function initializes device manager entity
 func NewManager(logger *zap.Logger, checkManager core.CheckRegistry) *manager {
 	return &manager{
 		devices: make(map[string]device.Device),
@@ -22,6 +23,7 @@ func NewManager(logger *zap.Logger, checkManager core.CheckRegistry) *manager {
 	}
 }
 
+// Representation of device manager entity
 type manager struct {
 	devices      map[string]device.Device
 	signals      chan core.Signal
@@ -29,14 +31,17 @@ type manager struct {
 	checkManager core.CheckRegistry
 }
 
+// Function returns signal channel value of device manager
 func (m *manager) GetSignals() chan core.Signal {
 	return m.signals
 }
 
+// Function returns current device list of device manager
 func (m *manager) GetDevices() map[string]device.Device {
 	return m.devices
 }
 
+// Function updates current device list of device manager
 func (m *manager) UpdateDevices(ctx context.Context, userConfig device.UserConfig) {
 	dmxDeviceConfig := userConfig.DMXDevices
 	artnetDeviceConfig := userConfig.ArtNetDevices
@@ -65,6 +70,7 @@ func (m *manager) UpdateDevices(ctx context.Context, userConfig device.UserConfi
 	}
 }
 
+// Function processing set channel command
 func (m *manager) ProcessSetChannel(ctx context.Context, command models.SetChannel) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -78,6 +84,7 @@ func (m *manager) ProcessSetChannel(ctx context.Context, command models.SetChann
 	return nil
 }
 
+// Function processing increment channel command
 func (m *manager) ProcessIncrementChannel(ctx context.Context, command models.IncrementChannel) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -91,6 +98,7 @@ func (m *manager) ProcessIncrementChannel(ctx context.Context, command models.In
 	return nil
 }
 
+// Function processing blackout command
 func (m *manager) ProcessBlackout(ctx context.Context, command models.Blackout) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -104,6 +112,7 @@ func (m *manager) ProcessBlackout(ctx context.Context, command models.Blackout) 
 	return nil
 }
 
+// Function processing set scene command
 func (m *manager) ProcessSetScene(ctx context.Context, command models.SetScene) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -117,6 +126,7 @@ func (m *manager) ProcessSetScene(ctx context.Context, command models.SetScene) 
 	return nil
 }
 
+// Function processing save scene command
 func (m *manager) ProcessSaveScene(ctx context.Context, command models.SaveScene) error {
 	dev, err := m.checkDevice(command.DeviceAlias)
 	if err != nil {
@@ -130,6 +140,7 @@ func (m *manager) ProcessSaveScene(ctx context.Context, command models.SaveScene
 	return nil
 }
 
+// Function checks devices list containing device with specified alias
 func (m *manager) checkDevice(deviceAlias string) (device.Device, error) {
 	dev, devExist := m.devices[deviceAlias]
 	if !devExist {
@@ -139,6 +150,7 @@ func (m *manager) checkDevice(deviceAlias string) (device.Device, error) {
 
 }
 
+// Function adds DMX device to device list
 func (m *manager) addDMX(ctx context.Context, conf device.DMXConfig) error {
 	newDMX, err := dmx.NewDMXDevice(ctx, m.signals, conf, m.logger, m.checkManager)
 	if err != nil {
@@ -148,6 +160,7 @@ func (m *manager) addDMX(ctx context.Context, conf device.DMXConfig) error {
 	return nil
 }
 
+// Function adds Artnet device to device list
 func (m *manager) addArtNet(ctx context.Context, conf device.ArtNetConfig) error {
 	newArtNet, err := artnet.NewArtNetDevice(ctx, m.signals, conf, m.logger, m.checkManager)
 	if err != nil {
@@ -157,6 +170,7 @@ func (m *manager) addArtNet(ctx context.Context, conf device.ArtNetConfig) error
 	return nil
 }
 
+// Function removes any device from device list
 func (m *manager) removeDevice(_ context.Context, alias string) error {
 	dev := m.devices[alias]
 	dev.Close()

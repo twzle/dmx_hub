@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-
+// Function initializes and returns Artnet device entity
 func NewArtNetDevice(ctx context.Context, signals chan core.Signal, conf device.ArtNetConfig, logger *zap.Logger, checkManager core.CheckRegistry) (device.Device, error) {
 	newArtNet := &artnetDevice{
 		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger, checkManager),
@@ -32,6 +32,7 @@ type artnetDevice struct {
 	dev    *artnet.Controller
 }
 
+// Function reconnects single Artnet device
 func (d *artnetDevice) reconnect() {
 	ticker := time.NewTicker(d.ReconnectInterval)
 	for {
@@ -49,7 +50,7 @@ func (d *artnetDevice) reconnect() {
 	}
 }
 
-
+// Function checks availability of single Artnet device
 func (d *artnetDevice) checkHealth() {
 	_, ok := d.dev.OutputAddress[artnet.Address{Net: d.net, SubUni: d.subUni}]
 	if ok {
@@ -59,7 +60,7 @@ func (d *artnetDevice) checkHealth() {
 	d.Connected.CompareAndSwap(true, false)
 }
 
-
+// Function connects to the Artnet device through network
 func (d *artnetDevice) connect() {
 	_, ok := d.dev.OutputAddress[artnet.Address{Net: d.net, SubUni: d.subUni}]
 	if !ok {
@@ -83,6 +84,7 @@ func (d *artnetDevice) connect() {
 	d.Logger.Info("Connected ArtNet device",  zap.Any("net", d.net), zap.Any("subuni", d.subUni))
 }
 
+// Function sets scene specified in command and updates universe of single Artnet device
 func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) error {
 	err := d.BaseDevice.SetScene(ctx, command)
 	if err != nil {
@@ -99,6 +101,7 @@ func (d *artnetDevice) SetScene(ctx context.Context, command models.SetScene) er
 	return nil
 }
 
+// Function sets and writes value to channel of universe specified in command for single Artnet device
 func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	err := d.BaseDevice.SetChannel(ctx, &command)
 	if err != nil {
@@ -112,6 +115,7 @@ func (d *artnetDevice) SetChannel(ctx context.Context, command models.SetChannel
 	return nil
 }
 
+// Function writes incremented value to channel of universe specified in command for single Artnet device
 func (d *artnetDevice) IncrementChannel(ctx context.Context, command models.IncrementChannel) error {
 	err := d.BaseDevice.IncrementChannel(ctx, &command)
 	if err != nil {
@@ -130,6 +134,7 @@ func (d *artnetDevice) IncrementChannel(ctx context.Context, command models.Incr
 	return nil
 }
 
+// Function writes universe to single Artnet device
 func (d *artnetDevice) WriteUniverseToDevice() error {
 	err := d.BaseDevice.WriteUniverseToDevice()
 	if err != nil {
@@ -140,6 +145,7 @@ func (d *artnetDevice) WriteUniverseToDevice() error {
 	return nil
 }
 
+// Function writes value to channel of universe specified in command for single Artnet device
 func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
 	err := d.BaseDevice.WriteValueToChannel(command)
 	if err != nil {
@@ -154,6 +160,7 @@ func (d *artnetDevice) WriteValueToChannel(command models.SetChannel) error {
 	return nil
 }
 
+// Function handles blackout for whole DMX universe of single Artnet device
 func (d *artnetDevice) Blackout(ctx context.Context) error {
 	err := d.BaseDevice.Blackout(ctx)
 	if err != nil {

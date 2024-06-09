@@ -9,16 +9,19 @@ const (
 	DefaultReconnectInterval = 1500
 )
 
+// Represenation of channel map entity
 type ChannelMapConfig struct {
 	SceneChannelID    uint16 `json:"scene_channel_id" yaml:"scene_channel_id"`
 	UniverseChannelID uint16 `json:"universe_channel_id" yaml:"universe_channel_id"`
 }
 
+// Represenation of scene configuration entity
 type SceneConfig struct {
 	Alias      string             `json:"scene_alias" yaml:"scene_alias"`
 	ChannelMap []ChannelMapConfig `json:"channel_map" yaml:"channel_map"`
 }
 
+// Represenation of Artnet device configuration entity in user configuration
 type ArtNetConfig struct {
 	Alias               string        `json:"alias" yaml:"alias"`
 	Net                 int           `json:"net" yaml:"net"`
@@ -28,6 +31,7 @@ type ArtNetConfig struct {
 	ReconnectInterval   int           `json:"reconnect_interval" yaml:"reconnect_interval"`
 }
 
+// Represenation of DMX device configuration entity in user configuration
 type DMXConfig struct {
 	Alias               string        `json:"alias" yaml:"alias"`
 	Path                string        `json:"path" yaml:"path"`
@@ -36,11 +40,13 @@ type DMXConfig struct {
 	ReconnectInterval   int           `json:"reconnect_interval" yaml:"reconnect_interval"`
 }
 
+// Represenation of user configuration entity
 type UserConfig struct {
 	DMXDevices    []DMXConfig    `json:"dmx_devices" yaml:"dmx_devices"`
 	ArtNetDevices []ArtNetConfig `json:"artnet_devices" yaml:"artnet_devices"`
 }
 
+// Function validating user configuration contents
 func (conf *UserConfig) Validate() error {
 	if len(conf.DMXDevices) == 0 && len(conf.ArtNetDevices) == 0 {
 		fmt.Println("DMX/ArtNet devices were not found in configuration file")
@@ -83,6 +89,7 @@ func (conf *UserConfig) Validate() error {
 	return nil
 }
 
+// Function check duplicating aliases in device list from user configuration
 func (conf *UserConfig) hasDuplicateDevices() (string, bool) {
 	x := make(map[string]struct{})
 
@@ -103,6 +110,7 @@ func (conf *UserConfig) hasDuplicateDevices() (string, bool) {
 	return "", false
 }
 
+// Function deserealizing user configuration
 func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
 	cfg := UserConfig{}
 
@@ -114,6 +122,7 @@ func ParseConfigFromBytes(data []byte) (*UserConfig, error) {
 	return &cfg, nil
 }
 
+// Function reading scene from user configuration of device
 func ReadScenesFromDeviceConfig(sceneListConfig []SceneConfig) map[string]Scene {
 	scenes := make(map[string]Scene)
 
@@ -134,6 +143,7 @@ func ReadScenesFromDeviceConfig(sceneListConfig []SceneConfig) map[string]Scene 
 	return scenes
 }
 
+// Function reading excluded channels from blackout operations from user configuration of device
 func ReadNonBlackoutChannelsFromDeviceConfig(nonBlackoutChannels []int) map[int]struct{} {
 	nonBlackoutChannelsMap := make(map[int]struct{})
 

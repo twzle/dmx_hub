@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Function reading universe from cache in Redis
 func (b *BaseDevice) ReadUnvierse(ctx context.Context) error {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -32,6 +33,7 @@ func (b *BaseDevice) ReadUnvierse(ctx context.Context) error {
 	return nil
 }
 
+// Function writing universe to cache in Redis
 func (b *BaseDevice) WriteUniverse(ctx context.Context) error {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -50,6 +52,7 @@ func (b *BaseDevice) WriteUniverse(ctx context.Context) error {
 	return nil
 }
 
+// Function reading scenes from cache in Redis
 func (b *BaseDevice) ReadScenes(ctx context.Context) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -86,6 +89,7 @@ func (b *BaseDevice) ReadScenes(ctx context.Context) {
 	}
 }
 
+// Function validationg cached scenes in Redis
 func (b *BaseDevice) ValidateCachedScene(cachedScene Scene, configuredScene Scene) error {
 	if len(cachedScene.ChannelMap) != len(configuredScene.ChannelMap) {
 		return fmt.Errorf("unequal channelMap sizes")
@@ -105,6 +109,7 @@ func (b *BaseDevice) ValidateCachedScene(cachedScene Scene, configuredScene Scen
 	return nil
 }
 
+// Function writing scenes to cache in Redis
 func (b *BaseDevice) WriteScenes(ctx context.Context) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -124,6 +129,7 @@ func (b *BaseDevice) WriteScenes(ctx context.Context) {
 	}
 }
 
+// Function decoding cached universe in Redis
 func (b *BaseDevice) DecodeUniverse(sequence string) error {
 	size := len(sequence)
 	if size % 9 != 0 {
@@ -175,6 +181,7 @@ func (b *BaseDevice) DecodeUniverse(sequence string) error {
 	return nil
 }
 
+// Function encoding universe to cache in Redis
 func (b *BaseDevice) EncodeUniverse() string {
 	var result string
 	var currentChannelValue int = int(b.Universe[0])
@@ -193,6 +200,7 @@ func (b *BaseDevice) EncodeUniverse() string {
 	return result
 }
 
+// Function encoding scene to cache in Redis
 func (b *BaseDevice) EncodeScene(scene Scene) string {
 	var result string
 
@@ -203,6 +211,7 @@ func (b *BaseDevice) EncodeScene(scene Scene) string {
 	return result
 }
 
+// Function decoding cached scene in Redis
 func (b *BaseDevice) DecodeScene(sequence string, scene Scene) (error) {
 	size := len(sequence)
 	if size % 9 != 0 {

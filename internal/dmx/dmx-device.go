@@ -12,6 +12,7 @@ import (
 	"git.miem.hse.ru/hubman/dmx-executor/internal/models"
 )
 
+// Function initializes and returns DMX device entity
 func NewDMXDevice(ctx context.Context, signals chan core.Signal, conf device.DMXConfig, logger *zap.Logger, checkManager core.CheckRegistry) (device.Device, error) {
 	newDMX := &dmxDevice{
 		BaseDevice: *device.NewBaseDevice(ctx, conf.Alias, conf.NonBlackoutChannels, conf.Scenes, conf.ReconnectInterval, signals, logger, checkManager),
@@ -29,6 +30,7 @@ type dmxDevice struct {
 	dev  *DMX
 }
 
+// Function reconnects single DMX device
 func (d *dmxDevice) reconnect() {
 	ticker := time.NewTicker(d.ReconnectInterval)
 	for {
@@ -46,6 +48,7 @@ func (d *dmxDevice) reconnect() {
 	}
 }
 
+// Function connects to the DMX device through OS
 func (d *dmxDevice) connect() {
 	dev, err := NewDMXConnection(d.path)
 	if err != nil {
@@ -73,6 +76,7 @@ func (d *dmxDevice) connect() {
 	d.Logger.Info("Connected DMX device", zap.Any("path", d.path))
 }
 
+// Function checks availability of single DMX device
 func (d *dmxDevice) checkHealth() {
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
@@ -84,6 +88,7 @@ func (d *dmxDevice) checkHealth() {
 	}
 }
 
+// Function writes universe to single DMX device
 func (d *dmxDevice) WriteUniverseToDevice() error {
 	err := d.BaseDevice.WriteUniverseToDevice()
 	if err != nil {
@@ -109,6 +114,7 @@ func (d *dmxDevice) WriteUniverseToDevice() error {
 	return nil
 }
 
+// Function sets scene specified in command and updates universe of single DMX device
 func (d *dmxDevice) SetScene(ctx context.Context, command models.SetScene) error {
 	err := d.BaseDevice.SetScene(ctx, command)
 	if err != nil {
@@ -128,6 +134,7 @@ func (d *dmxDevice) SetScene(ctx context.Context, command models.SetScene) error
 	return nil
 }
 
+// Function sets and writes value to channel of universe specified in command for single DMX device
 func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) error {
 	err := d.BaseDevice.SetChannel(ctx, &command)
 	if err != nil {
@@ -141,6 +148,7 @@ func (d *dmxDevice) SetChannel(ctx context.Context, command models.SetChannel) e
 	return nil
 }
 
+// Function writes incremented value to channel of universe specified in command for single DMX device
 func (d *dmxDevice) IncrementChannel(ctx context.Context, command models.IncrementChannel) error {
 	err := d.BaseDevice.IncrementChannel(ctx, &command)
 	if err != nil {
@@ -160,6 +168,7 @@ func (d *dmxDevice) IncrementChannel(ctx context.Context, command models.Increme
 	return nil
 }
 
+// Function writes value to channel of universe specified in command for single DMX device
 func (d *dmxDevice) WriteValueToChannel(command models.SetChannel) error {
 	err := d.BaseDevice.WriteValueToChannel(command)
 	if err != nil {
@@ -183,6 +192,7 @@ func (d *dmxDevice) WriteValueToChannel(command models.SetChannel) error {
 	return nil
 }
 
+// Function handles blackout for whole DMX universe of single DMX device
 func (d *dmxDevice) Blackout(ctx context.Context) error {
 	err := d.BaseDevice.Blackout(ctx)
 	if err != nil {
@@ -197,6 +207,7 @@ func (d *dmxDevice) Blackout(ctx context.Context) error {
 	return nil
 }
 
+// Function frees resources of DMX device entity
 func (d *dmxDevice) Close(){
 	d.BaseDevice.Close()
 	if d.Connected.Load() {

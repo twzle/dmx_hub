@@ -14,6 +14,11 @@ import (
 	"git.miem.hse.ru/hubman/hubman-lib/executor"
 )
 
+/* 
+Application entry point. 
+Initializes application with configuration data.
+Ends with termination of process.
+*/
 func main() {
 	systemConfig := &core.SystemConfig{}
 	userConfig := &device.UserConfig{}
